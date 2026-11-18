@@ -105,6 +105,13 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    // загрузка города по клику на уведомление.
+    // Устанавливаем isInitialLoadDone = true, чтобы initializeApp не перезаписал город GPS-ом
+    fun loadWeatherFromNotification(cityName: String) {
+        isInitialLoadDone = true
+        loadWeatherByCity(cityName)
+    }
+
     // вывод города при открытии приложения
     fun loadFallbackWeather() {
         val prefs = getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
@@ -120,7 +127,6 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         _settings.value = newSettings
         newSettings.save(getApplication())
 
-        // если включили/выключили уведомления или сменили время — пересобрать план
         if (prev.notificationsEnabled != newSettings.notificationsEnabled ||
             prev.notificationTime != newSettings.notificationTime
         ) {
@@ -131,8 +137,16 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
             )
         }
 
+        // расписание алертов включается, если включён хотя бы один из двух типов
+        val alertsShouldRun = newSettings.weatherChangeNotificationsEnabled ||
+                newSettings.severeWeatherNotificationsEnabled
+        val alertsWereOn = prev.weatherChangeNotificationsEnabled ||
+                prev.severeWeatherNotificationsEnabled
+        if (alertsShouldRun != alertsWereOn) {
+            NotificationScheduler.rescheduleAlerts(getApplication(), alertsShouldRun)
+        }
+
         if (languageChanged) {
-            // пересоздаём Activity — attachBaseContext подхватит новый язык из SharedPreferences
             viewModelScope.launch {
                 _languageChanged.emit(Unit)
             }
@@ -160,7 +174,11 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                 // сохраняем город для DailyForecastWorker
                 getApplication<Application>()
                     .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
-                    .edit { putString("current_city", response.location.name) }
+                    .edit {
+                        putString("current_city", response.location.name)
+                        putFloat("last_weather_temp", response.current.temperature.toFloat())
+                        putInt("last_weather_condition", response.current.condition.code)
+                    }
 
                 if (addToHistory) {
                     addToSearchHistory(response.location.name)
@@ -185,12 +203,21 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                     query = "$lat,$lon",
                     lang = _settings.value.language
                 )
-                _currentCity.value = response.location.name
+                val newCity = response.location.name
 
-                // сохраняем город для DailyForecastWorker
-                getApplication<Application>()
+                // детект перемещения: сравниваем с предыдущим GPS-городом
+                detectMovement(newCity, response.current.temperature, response.current.condition.text)
+
+                _currentCity.value = newCity
+
+                val prefs = getApplication<Application>()
                     .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
-                    .edit { putString("current_city", response.location.name) }
+                prefs.edit {
+                    putString("current_city", newCity)
+                    putFloat("last_weather_temp", response.current.temperature.toFloat())
+                    putInt("last_weather_condition", response.current.condition.code)
+                    putString("last_gps_city", newCity)  // ← отдельный ключ
+                }
 
                 _uiState.value = WeatherUiState.Success(response)
             } catch (e: Exception) {
@@ -199,6 +226,32 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                 )
             }
         }
+    }
+
+    // показывает уведомление о смене города, если GPS-город отличается от предыдущего GPS-города
+    private fun detectMovement(newCity: String, temperature: Double, conditionText: String) {
+        if (!_settings.value.movementNotificationsEnabled) return
+
+        val prefs = getApplication<Application>()
+            .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
+        val lastGpsCity = prefs.getString("last_gps_city", null) ?: return // первый запуск — не уведомляем
+
+        if (lastGpsCity == newCity) return
+
+        // контекст с нужной локалью для строк уведомления
+        val locale = java.util.Locale(_settings.value.language)
+        val config = android.content.res.Configuration(
+            getApplication<Application>().resources.configuration
+        ).apply { setLocale(locale) }
+        val localizedContext = getApplication<Application>().createConfigurationContext(config)
+
+        com.example.appweather.notifications.NotificationHelper.showMovement(
+            localizedContext,
+            newCity,
+            temperature,
+            conditionText,
+            _settings.value.tempUnit
+        )
     }
 
     // Получение GPS-локации

@@ -2,6 +2,7 @@ package com.example.appweather
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
@@ -10,9 +11,9 @@ import android.os.LocaleList
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.appweather.data.AppSettings
 import com.example.appweather.notifications.NotificationHelper
 import com.example.appweather.notifications.NotificationScheduler
@@ -23,22 +24,20 @@ import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
-    // обработчик запроса разрешения на уведомления (Android 13+)
+    // ViewModel создаётся в Activity (а не в setContent), чтобы можно было вызвать
+    // loadWeatherFromNotification() из handleIntent() до композиции
+    private val weatherViewModel: WeatherViewModel by viewModels()
+
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { /* результат нам не нужен: если отклонили, просто не будет пушей */ }
+    ) { }
 
     override fun attachBaseContext(newBase: Context) {
-        // 1. Загружаем настройки и определяем локаль
         val languageCode = AppSettings.load(newBase).language
         val locale = Locale(languageCode)
-
-        // 2. Создаем конфигурацию с нужной локалью
         val config = Configuration(newBase.resources.configuration).apply {
             setLocales(LocaleList(locale))
         }
-
-        // 3. Применяем конфигурацию к контексту Activity
         applyOverrideConfiguration(config)
         super.attachBaseContext(newBase)
     }
@@ -47,28 +46,43 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // канал уведомлений можно создавать всегда — повторный вызов безопасен
-        NotificationHelper.createChannel(this)
+        NotificationHelper.createChannels(this)
 
-        // на Android 13+ без разрешения уведомления не показываются — запрашиваем
         val granted = ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.POST_NOTIFICATIONS
+            this, Manifest.permission.POST_NOTIFICATIONS
         ) == PackageManager.PERMISSION_GRANTED
         if (!granted) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
-        // переустанавливаем расписание, если пользователь его включал ранее
         val settings = AppSettings.load(this)
         NotificationScheduler.reschedule(this, settings.notificationsEnabled, settings.notificationTime)
+        NotificationScheduler.rescheduleAlerts(
+            this,
+            settings.weatherChangeNotificationsEnabled || settings.severeWeatherNotificationsEnabled
+        )
 
         setContent {
-            val weatherViewModel: WeatherViewModel = viewModel()
-
             AppWeatherTheme {
                 WeatherScreen(viewModel = weatherViewModel)
             }
         }
+
+        // если приложение открыто кликом по уведомлению — загружаем город из extra
+        handleIntent(intent)
+    }
+
+    // если приложение уже было в памяти и пришло новое уведомление
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        val city = intent?.getStringExtra(NotificationHelper.EXTRA_CITY) ?: return
+        // предотвращаем перезапись города из initializeApp
+        weatherViewModel.loadWeatherFromNotification(city)
+        // очищаем extra, чтобы повторный вызов onCreate с тем же intent не грузил город снова
+        intent.removeExtra(NotificationHelper.EXTRA_CITY)
     }
 }

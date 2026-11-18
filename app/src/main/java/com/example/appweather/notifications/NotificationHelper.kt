@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -14,39 +15,48 @@ import com.example.appweather.MainActivity
 import com.example.appweather.R
 import com.example.appweather.data.WeatherResponse
 import com.example.appweather.data.WeatherUtils
-import kotlin.math.roundToInt
 
 object NotificationHelper {
 
-    const val CHANNEL_ID = "daily_forecast_channel"
-    const val NOTIFICATION_ID = 1001
+    // каналы
+    const val CHANNEL_ID_DAILY = "daily_forecast_channel"
+    const val CHANNEL_ID_ALERTS = "weather_alerts_channel"
 
-    // создаётся при старте приложения, повторный вызов безопасен
-    fun createChannel(context: Context) {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            context.getString(R.string.notification_channel_name),
-            NotificationManager.IMPORTANCE_DEFAULT
-        ).apply {
-            description = context.getString(R.string.notification_channel_description)
+    // идентификаторы, чтобы уведомления не перезаписывали друг друга
+    const val NOTIFICATION_ID_DAILY = 1001
+    const val NOTIFICATION_ID_CHANGE = 1002
+    const val NOTIFICATION_ID_SEVERE = 1003
+    const val NOTIFICATION_ID_MOVEMENT = 1004
+
+    // ключ extra для передачи города при клике
+    const val EXTRA_CITY = "extra_city"
+
+    fun createChannels(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = context.getSystemService(NotificationManager::class.java)
+            manager?.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ID_DAILY,
+                    context.getString(R.string.notification_channel_name),
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply { description = context.getString(R.string.notification_channel_description) }
+            )
+            manager?.createNotificationChannel(
+                NotificationChannel(
+                    CHANNEL_ID_ALERTS,
+                    context.getString(R.string.alerts_channel_name),
+                    NotificationManager.IMPORTANCE_HIGH
+                ).apply { description = context.getString(R.string.alerts_channel_description) }
+            )
         }
-        val manager = context.getSystemService(NotificationManager::class.java)
-        manager?.createNotificationChannel(channel)
     }
 
-    // показывает ежедневный прогноз по уже загруженным данным
+    // ЕЖЕДНЕВНЫЙ ПРОГНОЗ (существующий)
     fun showDailyForecast(context: Context, weather: WeatherResponse) {
-        // на Android 13+ без разрешения показывать нельзя
-        val granted = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.POST_NOTIFICATIONS
-        ) == PackageManager.PERMISSION_GRANTED
-        if (!granted) return
+        if (!hasPermission(context)) return
 
         val current = weather.current
         val today = weather.forecast.forecastday.firstOrNull()
-
-        // форматируем температуру по настройкам пользователя
         val unit = context.getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
             .getString("temp_unit", "C") ?: "C"
         val tempNow = WeatherUtils.formatTemp(current.temperature, unit)
@@ -54,40 +64,96 @@ object NotificationHelper {
         val tempMax = today?.day?.tempMax?.let { WeatherUtils.formatTemp(it, unit) } ?: "--"
 
         val title = "${weather.location.name}: $tempNow"
-        val text = "${current.condition.text} · $tempMin / $tempMax · ${context.getString(R.string.notification_rain_chance)} ${today?.day?.chanceOfRain ?: 0}%"
+        val text = "${current.condition.text} · $tempMin / $tempMax · " +
+                "${context.getString(R.string.notification_rain_chance)} ${today?.day?.chanceOfRain ?: 0}%"
 
-        // по клику открываем приложение
+        post(context, CHANNEL_ID_DAILY, NOTIFICATION_ID_DAILY,
+            weather.location.name, title, text,
+            NotificationCompat.PRIORITY_DEFAULT)
+    }
+
+    // ИЗМЕНЕНИЕ ПОГОДЫ
+    fun showWeatherChange(
+        context: Context,
+        city: String,
+        oldTemp: Double,
+        newTemp: Double,
+        conditionText: String,
+        unit: String
+    ) {
+        if (!hasPermission(context)) return
+
+        val title = context.getString(R.string.notification_change_title, city)
+        val oldStr = WeatherUtils.formatTemp(oldTemp, unit)
+        val newStr = WeatherUtils.formatTemp(newTemp, unit)
+        val text = context.getString(R.string.notification_change_text, oldStr, newStr, conditionText)
+
+        post(context, CHANNEL_ID_ALERTS, NOTIFICATION_ID_CHANGE,
+            city, title, text, NotificationCompat.PRIORITY_DEFAULT)
+    }
+
+    // ПЛОХИЕ УСЛОВИЯ
+    fun showSevereWeather(context: Context, city: String, alertText: String, conditionText: String) {
+        if (!hasPermission(context)) return
+
+        val title = context.getString(R.string.notification_severe_title, city)
+        val text = "$alertText · $conditionText"
+
+        post(context, CHANNEL_ID_ALERTS, NOTIFICATION_ID_SEVERE,
+            city, title, text, NotificationCompat.PRIORITY_HIGH)
+    }
+
+    // СМЕНА ГОРОДА
+    fun showMovement(context: Context, city: String, temperature: Double, conditionText: String, unit: String) {
+        if (!hasPermission(context)) return
+
+        val title = context.getString(R.string.notification_movement_title)
+        val temp = WeatherUtils.formatTemp(temperature, unit)
+        val text = context.getString(R.string.notification_movement_text, city, temp, conditionText)
+
+        post(context, CHANNEL_ID_ALERTS, NOTIFICATION_ID_MOVEMENT,
+            city, title, text, NotificationCompat.PRIORITY_DEFAULT)
+    }
+
+    // единая точка сборки уведомления
+    private fun post(
+        context: Context,
+        channelId: String,
+        notificationId: Int,
+        city: String,
+        title: String,
+        text: String,
+        priority: Int
+    ) {
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(EXTRA_CITY, city)  // ← главное: передаём город
         }
         val pendingIntent = PendingIntent.getActivity(
             context,
-            0,
+            notificationId,   // requestCode = id, чтобы интенты не перекрывались
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(priority)
             .build()
 
         try {
-            android.util.Log.d("NotificationHelper", "Showing notification for ${weather.location.name}")
-            NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
-        } catch (e: SecurityException) {
-            // разрешение могли отозвать между проверкой и вызовом — молча игнорируем
-        }
+            NotificationManagerCompat.from(context).notify(notificationId, notification)
+        } catch (e: SecurityException) { /* разрешение могли отозвать */ }
     }
 
-    // утилита: склонение «градус» не нужно — используем формат из WeatherUtils
-    @Suppress("unused")
-    fun tempWithUnit(celsius: Double, unit: String): String =
-        if (unit == "F") "${((celsius * 9 / 5) + 32).roundToInt()}°F"
-        else "${celsius.roundToInt()}°C"
+    private fun hasPermission(context: Context): Boolean {
+        return ContextCompat.checkSelfPermission(
+            context, Manifest.permission.POST_NOTIFICATIONS
+        ) == PackageManager.PERMISSION_GRANTED
+    }
 }

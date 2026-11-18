@@ -2,6 +2,8 @@ package com.example.appweather.ui.components
 
 import android.app.TimePickerDialog
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -12,25 +14,6 @@ import androidx.compose.ui.unit.dp
 import com.example.appweather.R
 import com.example.appweather.data.AppSettings
 import androidx.compose.foundation.layout.FlowRow
-
-// форматирует "HH:mm" для отображения на кнопке с учётом настроек
-private fun formatNotificationTime(time24: String, timeFormat: String): String {
-    if (timeFormat != "12h") return time24
-    return try {
-        val parts = time24.split(":")
-        val h = parts[0].toInt()
-        val m = parts[1].toInt()
-        val amPm = if (h < 12) "AM" else "PM"
-        val h12 = when {
-            h == 0 -> 12
-            h > 12 -> h - 12
-            else -> h
-        }
-        "%02d:%02d %s".format(h12, m, amPm)
-    } catch (e: Exception) {
-        time24
-    }
-}
 
 @Composable
 fun SettingsDialog(
@@ -47,11 +30,16 @@ fun SettingsDialog(
     var notificationsEnabled by remember { mutableStateOf(currentSettings.notificationsEnabled) }
     var notificationTime by remember { mutableStateOf(currentSettings.notificationTime) }
 
+    var weatherChangeEnabled by remember { mutableStateOf(currentSettings.weatherChangeNotificationsEnabled) }
+    var severeWeatherEnabled by remember { mutableStateOf(currentSettings.severeWeatherNotificationsEnabled) }
+    var movementEnabled by remember { mutableStateOf(currentSettings.movementNotificationsEnabled) }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings)) },
         text = {
-            Column {
+            // Добавлен verticalScroll, чтобы окно прокручивалось при нехватке высоты
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                 // Язык
                 Text(stringResource(R.string.language), style = MaterialTheme.typography.titleSmall)
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -124,10 +112,10 @@ fun SettingsDialog(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-
-                // Ежедневный прогноз в уведомлении
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
+
+                // Ежедневный прогноз в уведомлении
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -156,11 +144,9 @@ fun SettingsDialog(
                                 val parts = notificationTime.split(":")
                                 val h = parts.getOrNull(0)?.toIntOrNull() ?: 8
                                 val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
-                                // is24HourView = false, если выбран 12-часовой формат
                                 TimePickerDialog(
                                     context,
                                     { _, pickedH, pickedM ->
-                                        // onTimeSet всегда возвращает часы 0..23 — сохраняем в 24-часовом
                                         notificationTime = "%02d:%02d".format(pickedH, pickedM)
                                     },
                                     h, m,
@@ -168,10 +154,61 @@ fun SettingsDialog(
                                 ).show()
                             }
                         ) {
-                            // отображаем время с учётом выбранного формата
                             Text(formatNotificationTime(notificationTime, timeFormat))
                         }
                     }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Умные уведомления
+                Text(
+                    stringResource(R.string.smart_notifications),
+                    style = MaterialTheme.typography.titleSmall
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stringResource(R.string.weather_change_toggle))
+                    Switch(
+                        checked = weatherChangeEnabled,
+                        onCheckedChange = { weatherChangeEnabled = it }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(stringResource(R.string.severe_weather_toggle))
+                    Switch(
+                        checked = severeWeatherEnabled,
+                        onCheckedChange = { severeWeatherEnabled = it }
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    // Колонка с текстом занимает всё доступное место, Switch жмётся вправо
+                    Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text(stringResource(R.string.movement_toggle))
+                        Text(
+                            stringResource(R.string.movement_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = movementEnabled,
+                        onCheckedChange = { movementEnabled = it }
+                    )
                 }
             }
         },
@@ -185,7 +222,10 @@ fun SettingsDialog(
                         language = language,
                         timeFormat = timeFormat,
                         notificationsEnabled = notificationsEnabled,
-                        notificationTime = notificationTime
+                        notificationTime = notificationTime,
+                        weatherChangeNotificationsEnabled = weatherChangeEnabled,
+                        severeWeatherNotificationsEnabled = severeWeatherEnabled,
+                        movementNotificationsEnabled = movementEnabled
                     )
                 )
                 onDismiss()
@@ -199,4 +239,23 @@ fun SettingsDialog(
             }
         }
     )
+}
+
+// Вспомогательная функция для форматирования времени на кнопке
+private fun formatNotificationTime(time24: String, timeFormat: String): String {
+    if (timeFormat != "12h") return time24
+    return try {
+        val parts = time24.split(":")
+        val h = parts[0].toInt()
+        val m = parts[1].toInt()
+        val amPm = if (h < 12) "AM" else "PM"
+        val h12 = when {
+            h == 0 -> 12
+            h > 12 -> h - 12
+            else -> h
+        }
+        "%02d:%02d %s".format(h12, m, amPm)
+    } catch (e: Exception) {
+        time24
+    }
 }

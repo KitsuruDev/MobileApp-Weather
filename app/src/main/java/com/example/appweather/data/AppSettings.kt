@@ -10,9 +10,11 @@ data class AppSettings(
     val language: String = "ru",
     val timeFormat: String = "24h",
     val notificationsEnabled: Boolean = false,
-    val notificationTime: String = "08:00"
+    val notificationTime: String = "08:00",
+    val weatherChangeNotificationsEnabled: Boolean = false,
+    val severeWeatherNotificationsEnabled: Boolean = false,
+    val movementNotificationsEnabled: Boolean = false
 ) {
-    // вызывает у созданного load-ом объекта
     fun save(context: Context) {
         val prefs = context.getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
         prefs.edit {
@@ -23,10 +25,12 @@ data class AppSettings(
             putString("time_format", timeFormat)
             putBoolean("notifications_enabled", notificationsEnabled)
             putString("notification_time", notificationTime)
+            putBoolean("weather_change_notifications_enabled", weatherChangeNotificationsEnabled)
+            putBoolean("severe_weather_notifications_enabled", severeWeatherNotificationsEnabled)
+            putBoolean("movement_notifications_enabled", movementNotificationsEnabled)
         }
     }
 
-    // статическая функция (для вызова не надо объект класса создавать)
     companion object {
         fun load(context: Context): AppSettings {
             val prefs = context.getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
@@ -37,7 +41,10 @@ data class AppSettings(
                 language = prefs.getString("language", "ru") ?: "ru",
                 timeFormat = prefs.getString("time_format", "24h") ?: "24h",
                 notificationsEnabled = prefs.getBoolean("notifications_enabled", false),
-                notificationTime = prefs.getString("notification_time", "08:00") ?: "08:00"
+                notificationTime = prefs.getString("notification_time", "08:00") ?: "08:00",
+                weatherChangeNotificationsEnabled = prefs.getBoolean("weather_change_notifications_enabled", false),
+                severeWeatherNotificationsEnabled = prefs.getBoolean("severe_weather_notifications_enabled", false),
+                movementNotificationsEnabled = prefs.getBoolean("movement_notifications_enabled", false)
             )
         }
     }

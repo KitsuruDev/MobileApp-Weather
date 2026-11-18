@@ -1,20 +1,23 @@
 package com.example.appweather.notifications
 
 import android.content.Context
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 object NotificationScheduler {
 
-    private const val WORK_NAME = "daily_forecast_work"
+    private const val WORK_NAME_DAILY = "daily_forecast_work"
+    private const val WORK_NAME_ALERTS = "weather_alerts_work"
 
-    // Планирует ОДНОразовый запуск на ближайшее заданное время
+    // ===== ЕЖЕДНЕВНЫЙ ПРОГНОЗ =====
+
     fun schedule(context: Context, time: String) {
         val (hour, minute) = parseTime(time)
-
         val now = Calendar.getInstance()
         val target = Calendar.getInstance().apply {
             set(Calendar.HOUR_OF_DAY, hour)
@@ -22,35 +25,45 @@ object NotificationScheduler {
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }
-        // если сегодня это время уже прошло — стартуем завтра
-        if (target.timeInMillis <= now.timeInMillis) {
-            target.add(Calendar.DAY_OF_MONTH, 1)
-        }
+        if (target.timeInMillis <= now.timeInMillis) target.add(Calendar.DAY_OF_MONTH, 1)
         val initialDelayMs = target.timeInMillis - now.timeInMillis
-
-        android.util.Log.d("NotificationScheduler", "schedule(): time=$time, initialDelayMs=$initialDelayMs")
 
         val request = OneTimeWorkRequestBuilder<DailyForecastWorker>()
             .setInitialDelay(initialDelayMs, TimeUnit.MILLISECONDS)
             .build()
 
-        // KEEP: если задача уже запланирована — не трогаем её
         WorkManager.getInstance(context).enqueueUniqueWork(
-            WORK_NAME,
-            ExistingWorkPolicy.KEEP,
-            request
+            WORK_NAME_DAILY, ExistingWorkPolicy.KEEP, request
         )
     }
 
-    // снимает запланированную задачу
     fun cancel(context: Context) {
-        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
+        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME_DAILY)
     }
 
-    // пересборка плана
     fun reschedule(context: Context, enabled: Boolean, time: String) {
         cancel(context)
         if (enabled) schedule(context, time)
+    }
+
+    // ===== УМНЫЕ УВЕДОМЛЕНИЯ (изменение погоды + плохие условия) =====
+
+    fun scheduleAlerts(context: Context) {
+        val request = PeriodicWorkRequestBuilder<WeatherAlertWorker>(4, TimeUnit.HOURS)
+            .build()
+
+        // UPDATE позволяет при повторном вызове просто продлить существующее расписание
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            WORK_NAME_ALERTS, ExistingPeriodicWorkPolicy.KEEP, request
+        )
+    }
+
+    fun cancelAlerts(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME_ALERTS)
+    }
+
+    fun rescheduleAlerts(context: Context, enabled: Boolean) {
+        if (enabled) scheduleAlerts(context) else cancelAlerts(context)
     }
 
     private fun parseTime(time: String): Pair<Int, Int> {

@@ -96,4 +96,26 @@
     <string name="notification_rain_chance">Осадки</string>
     <string name="daily_notification">Уведомление с прогнозом</string>
     <string name="notification_time">Время уведомления</string>
+    <string name="alerts_channel_name">Оповещения о погоде</string>
+    <string name="alerts_channel_description">Изменения погоды, плохие условия и перемещения</string>
+
+    <string name="smart_notifications">Умные уведомления</string>
+    <string name="weather_change_toggle">Изменения погоды</string>
+    <string name="severe_weather_toggle">Плохие условия</string>
+    <string name="movement_toggle">Значительное перемещение</string>
+    <string name="movement_hint">Проверяется только при открытии приложения</string>
+
+    <string name="notification_change_title">Погода изменилась в %1$s</string>
+    <string name="notification_change_text">%1$s → %2$s, %3$s</string>
+    <string name="notification_severe_title">⚠ Предупреждение о погоде в %1$s</string>
+    <string name="notification_movement_title">Вы в новом городе</string>
+    <string name="notification_movement_text">Добро пожаловать в %1$s! %2$s, %3$s</string>
+
+    <string name="severe_wind">Сильный ветер</string>
+    <string name="severe_thunderstorm">Гроза</string>
+    <string name="severe_snow">Сильный снегопад</string>
+    <string name="severe_rain">Сильный дождь</string>
+    <string name="severe_uv">Очень высокий УФ</string>
+    <string name="severe_heat">Экстремальная жара</string>
+    <string name="severe_cold">Сильный мороз</string>
 </resources>

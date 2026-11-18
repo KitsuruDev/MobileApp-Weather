@@ -96,4 +96,26 @@
     <string name="notification_rain_chance">Rain</string>
     <string name="daily_notification">Daily forecast notification</string>
     <string name="notification_time">Notification time</string>
+    <string name="alerts_channel_name">Weather alerts</string>
+    <string name="alerts_channel_description">Weather changes, severe conditions and movement</string>
+
+    <string name="smart_notifications">Smart notifications</string>
+    <string name="weather_change_toggle">Weather changes</string>
+    <string name="severe_weather_toggle">Severe weather</string>
+    <string name="movement_toggle">Significant movement</string>
+    <string name="movement_hint">Only checked when the app opens</string>
+
+    <string name="notification_change_title">Weather change in %1$s</string>
+    <string name="notification_change_text">%1$s → %2$s, %3$s</string>
+    <string name="notification_severe_title">⚠ Weather alert for %1$s</string>
+    <string name="notification_movement_title">You are in a new city</string>
+    <string name="notification_movement_text">Welcome to %1$s! %2$s, %3$s</string>
+
+    <string name="severe_wind">Strong wind</string>
+    <string name="severe_thunderstorm">Thunderstorm</string>
+    <string name="severe_snow">Heavy snow</string>
+    <string name="severe_rain">Heavy rain</string>
+    <string name="severe_uv">Very high UV</string>
+    <string name="severe_heat">Extreme heat</string>
+    <string name="severe_cold">Severe frost</string>
 </resources>
