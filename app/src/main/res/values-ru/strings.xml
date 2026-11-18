@@ -91,4 +91,9 @@
     <string name="aqi_unhealthy">Вредное</string>
     <string name="aqi_very_unhealthy">Очень вредное</string>
     <string name="aqi_hazardous">Опасно</string>
+    <string name="notification_channel_name">Ежедневный прогноз</string>
+    <string name="notification_channel_description">Ежедневный прогноз погоды в выбранное время</string>
+    <string name="notification_rain_chance">Осадки</string>
+    <string name="daily_notification">Уведомление с прогнозом</string>
+    <string name="notification_time">Время уведомления</string>
 </resources>

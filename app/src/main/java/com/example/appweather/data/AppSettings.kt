@@ -8,7 +8,9 @@ data class AppSettings(
     val windUnit: String = "kmh",
     val pressureUnit: String = "hPa",
     val language: String = "ru",
-    val timeFormat: String = "24h"
+    val timeFormat: String = "24h",
+    val notificationsEnabled: Boolean = false,
+    val notificationTime: String = "08:00"
 ) {
     // вызывает у созданного load-ом объекта
     fun save(context: Context) {
@@ -19,6 +21,8 @@ data class AppSettings(
             putString("pressure_unit", pressureUnit)
             putString("language", language)
             putString("time_format", timeFormat)
+            putBoolean("notifications_enabled", notificationsEnabled)
+            putString("notification_time", notificationTime)
         }
     }
 
@@ -31,7 +35,9 @@ data class AppSettings(
                 windUnit = prefs.getString("wind_unit", "kmh") ?: "kmh",
                 pressureUnit = prefs.getString("pressure_unit", "hPa") ?: "hPa",
                 language = prefs.getString("language", "ru") ?: "ru",
-                timeFormat = prefs.getString("time_format", "24h") ?: "24h"
+                timeFormat = prefs.getString("time_format", "24h") ?: "24h",
+                notificationsEnabled = prefs.getBoolean("notifications_enabled", false),
+                notificationTime = prefs.getString("notification_time", "08:00") ?: "08:00"
             )
         }
     }

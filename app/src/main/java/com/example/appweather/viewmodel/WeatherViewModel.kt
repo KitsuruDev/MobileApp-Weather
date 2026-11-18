@@ -9,6 +9,7 @@ import com.example.appweather.data.AppSettings
 import com.example.appweather.data.SearchLocation
 import com.example.appweather.data.WeatherResponse
 import com.example.appweather.network.RetrofitClient
+import com.example.appweather.notifications.NotificationScheduler
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -114,9 +115,21 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun updateSettings(newSettings: AppSettings) {
-        val languageChanged = _settings.value.language != newSettings.language
+        val prev = _settings.value
+        val languageChanged = prev.language != newSettings.language
         _settings.value = newSettings
         newSettings.save(getApplication())
+
+        // если включили/выключили уведомления или сменили время — пересобрать план
+        if (prev.notificationsEnabled != newSettings.notificationsEnabled ||
+            prev.notificationTime != newSettings.notificationTime
+        ) {
+            NotificationScheduler.reschedule(
+                getApplication(),
+                newSettings.notificationsEnabled,
+                newSettings.notificationTime
+            )
+        }
 
         if (languageChanged) {
             // пересоздаём Activity — attachBaseContext подхватит новый язык из SharedPreferences
@@ -143,6 +156,12 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                     lang = _settings.value.language
                 )
                 _currentCity.value = response.location.name
+
+                // сохраняем город для DailyForecastWorker
+                getApplication<Application>()
+                    .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
+                    .edit { putString("current_city", response.location.name) }
+
                 if (addToHistory) {
                     addToSearchHistory(response.location.name)
                 }
@@ -167,6 +186,12 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                     lang = _settings.value.language
                 )
                 _currentCity.value = response.location.name
+
+                // сохраняем город для DailyForecastWorker
+                getApplication<Application>()
+                    .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
+                    .edit { putString("current_city", response.location.name) }
+
                 _uiState.value = WeatherUiState.Success(response)
             } catch (e: Exception) {
                 _uiState.value = WeatherUiState.Error(

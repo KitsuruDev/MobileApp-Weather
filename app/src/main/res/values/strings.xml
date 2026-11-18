@@ -91,4 +91,9 @@
     <string name="aqi_unhealthy">Unhealthy</string>
     <string name="aqi_very_unhealthy">Very unhealthy</string>
     <string name="aqi_hazardous">Hazardous</string>
+    <string name="notification_channel_name">Daily forecast</string>
+    <string name="notification_channel_description">Daily weather forecast at your chosen time</string>
+    <string name="notification_rain_chance">Rain</string>
+    <string name="daily_notification">Daily forecast notification</string>
+    <string name="notification_time">Notification time</string>
 </resources>

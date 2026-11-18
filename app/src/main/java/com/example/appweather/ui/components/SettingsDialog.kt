@@ -1,10 +1,12 @@
 package com.example.appweather.ui.components
 
+import android.app.TimePickerDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.appweather.R
@@ -17,11 +19,14 @@ fun SettingsDialog(
     onSettingsChanged: (AppSettings) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     var tempUnit by remember { mutableStateOf(currentSettings.tempUnit) }
     var windUnit by remember { mutableStateOf(currentSettings.windUnit) }
     var pressureUnit by remember { mutableStateOf(currentSettings.pressureUnit) }
     var language by remember { mutableStateOf(currentSettings.language) }
     var timeFormat by remember { mutableStateOf(currentSettings.timeFormat) }
+    var notificationsEnabled by remember { mutableStateOf(currentSettings.notificationsEnabled) }
+    var notificationTime by remember { mutableStateOf(currentSettings.notificationTime) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -98,11 +103,68 @@ fun SettingsDialog(
                     RadioButton(selected = timeFormat == "12h", onClick = { timeFormat = "12h" })
                     Text(stringResource(R.string.time_12h))
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Ежедневный прогноз в уведомлении
+                HorizontalDivider()
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        stringResource(R.string.daily_notification),
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Switch(
+                        checked = notificationsEnabled,
+                        onCheckedChange = { notificationsEnabled = it }
+                    )
+                }
+
+                if (notificationsEnabled) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(stringResource(R.string.notification_time))
+                        OutlinedButton(
+                            onClick = {
+                                val parts = notificationTime.split(":")
+                                val h = parts.getOrNull(0)?.toIntOrNull() ?: 8
+                                val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                                TimePickerDialog(
+                                    context,
+                                    { _, pickedH, pickedM ->
+                                        notificationTime = "%02d:%02d".format(pickedH, pickedM)
+                                    },
+                                    h, m, true
+                                ).show()
+                            }
+                        ) {
+                            Text(notificationTime)
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                onSettingsChanged(AppSettings(tempUnit, windUnit, pressureUnit, language, timeFormat))
+                onSettingsChanged(
+                    AppSettings(
+                        tempUnit = tempUnit,
+                        windUnit = windUnit,
+                        pressureUnit = pressureUnit,
+                        language = language,
+                        timeFormat = timeFormat,
+                        notificationsEnabled = notificationsEnabled,
+                        notificationTime = notificationTime
+                    )
+                )
                 onDismiss()
             }) {
                 Text(stringResource(R.string.save))
