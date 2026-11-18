@@ -35,7 +35,6 @@ import com.example.appweather.ui.components.SettingsDialog
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
-import kotlinx.coroutines.delay
 
 @OptIn(
     ExperimentalLayoutApi::class,
@@ -69,6 +68,9 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
         Manifest.permission.ACCESS_FINE_LOCATION
     )
 
+    val favoriteLimitMessage = stringResource(R.string.favorite_limit_reached)
+    val mapAppNotFoundMessage = stringResource(R.string.map_app_not_found)
+
     // Пересоздание Activity при смене языка.
     // ViewModel при recreate() переживает пересоздание, поэтому данные не потеряются,
     // а attachBaseContext в MainActivity применит новую локаль ко всем строкам.
@@ -89,11 +91,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
     // toast при переполнении количества избранных городов
     LaunchedEffect(favoriteLimitReached) {
         if (favoriteLimitReached) {
-            Toast.makeText(
-                context,
-                "Нельзя добавить более 10 городов в избранное",
-                Toast.LENGTH_SHORT
-            ).show()
+            Toast.makeText(context, favoriteLimitMessage, Toast.LENGTH_SHORT).show()
             viewModel.resetFavoriteLimitFlag()
         }
     }
@@ -134,7 +132,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 
                     // детальная информация
                     IconButton(onClick = { showDetailsSheet = true }) {
-                        Icon(Icons.Default.Info, contentDescription = "Подробная информация")
+                        Icon(Icons.Default.Info, contentDescription = stringResource(R.string.details_content_desc))
                     }
 
                     // настройки
@@ -261,7 +259,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                             val isFavorite = favoriteCities.any { it.name == currentCity }
                             Icon(
                                 imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                                contentDescription = "В избранное",
+                                contentDescription = stringResource(R.string.favorite_content_desc),
                                 tint = if (isFavorite) Color(0xFFFFB300) else Color.Gray
                             )
                         }
@@ -541,24 +539,28 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Text("Детали погоды", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text(
+                    stringResource(R.string.details_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     DetailItem(
-                        "УФ-индекс",
-                        "${current.uv} (${WeatherUtils.getUvDescription(current.uv)})",
+                        stringResource(R.string.uv_index),
+                        "${current.uv} (${WeatherUtils.getUvDescription(context, current.uv)})",
                         modifier = Modifier.weight(1f)
                     )
                     DetailItem(
-                        "AQI",
-                        "${current.airQuality?.pm25 ?: 0.0} (${WeatherUtils.getAqiDescription(current.airQuality?.epaIndex ?: 1)})",
+                        stringResource(R.string.air_quality),
+                        "${current.airQuality?.pm25 ?: 0.0} (${WeatherUtils.getAqiDescription(context, current.airQuality?.epaIndex ?: 1)})",
                         modifier = Modifier.weight(1f)
                     )
                     DetailItem(
-                        "Фаза луны",
+                        stringResource(R.string.moon_phase),
                         "${WeatherUtils.getMoonPhaseString(context, today?.astro?.moonPhase ?: "")} (${today?.astro?.moonIllumination ?: 0}%)",
                         modifier = Modifier.weight(1f)
                     )
@@ -577,12 +579,12 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                         try {
                             context.startActivity(intent)
                         } catch (e: Exception) {
-                            Toast.makeText(context, "Не найдено приложение для открытия карты", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, mapAppNotFoundMessage, Toast.LENGTH_SHORT).show()
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Открыть карту осадков")
+                    Text(stringResource(R.string.open_precipitation_map))
                 }
 
                 // ИСТОРИЯ ПОГОДЫ
@@ -599,7 +601,10 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text(if (isHistoryLoading) "Загрузка..." else "Узнать погоду за вчера")
+                    Text(
+                        if (isHistoryLoading) stringResource(R.string.loading)
+                        else stringResource(R.string.yesterday_weather)
+                    )
                 }
 
                 if (historyRequested) {
@@ -610,7 +615,10 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
                             Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text("Погода вчера", fontWeight = FontWeight.Bold)
+                                Text(
+                                    stringResource(R.string.yesterday_weather_title),
+                                    fontWeight = FontWeight.Bold
+                                )
 
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     WeatherUtils.WeatherIcon(
@@ -625,16 +633,19 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                                     )
                                 }
 
-                                Text("Погода: ${histDay?.day?.condition?.text ?: "--"}")
-                                Text("Влажность: ${histDay?.day?.avgHumidity ?: "--"} %")
-                                Text("Ветер: ${histDay?.day?.maxWindKmh?.let { WeatherUtils.formatWind(context, it, settings.windUnit) } ?: "--"}")
+                                Text("${stringResource(R.string.weather_label)} ${histDay?.day?.condition?.text ?: "--"}")
+                                Text("${stringResource(R.string.humidity_label)} ${histDay?.day?.avgHumidity ?: "--"} %")
+                                Text("${stringResource(R.string.wind_label)} ${histDay?.day?.maxWindKmh?.let { WeatherUtils.formatWind(context, it, settings.windUnit) } ?: "--"}")
 
                                 val histPressure = historyData?.forecast?.forecastday?.firstOrNull()?.hour?.firstOrNull()?.pressure
-                                Text("Давление: ${histPressure?.let { WeatherUtils.formatPressure(context, it, settings.pressureUnit) } ?: "--"}")
+                                Text("${stringResource(R.string.pressure_label)} ${histPressure?.let { WeatherUtils.formatPressure(context, it, settings.pressureUnit) } ?: "--"}")
                             }
                         }
                     } else if (!isHistoryLoading) {
-                        Text("Данные об истории недоступны", color = Color.Gray)
+                        Text(
+                            stringResource(R.string.history_unavailable),
+                            color = Color.Gray
+                        )
                     }
                 }
 

@@ -86,24 +86,24 @@ object WeatherUtils {
         }
     }
 
-    fun getUvDescription(uv: Double): String {
+    fun getUvDescription(context: Context, uv: Double): String {
         return when {
-            uv < 3 -> "Низкий"
-            uv < 6 -> "Средний"
-            uv < 8 -> "Высокий"
-            uv < 11 -> "Очень высокий"
-            else -> "Экстремальный"
+            uv < 3 -> context.getString(R.string.uv_low)
+            uv < 6 -> context.getString(R.string.uv_moderate)
+            uv < 8 -> context.getString(R.string.uv_high)
+            uv < 11 -> context.getString(R.string.uv_very_high)
+            else -> context.getString(R.string.uv_extreme)
         }
     }
 
-    fun getAqiDescription(index: Int): String {
+    fun getAqiDescription(context: Context, index: Int): String {
         return when (index) {
-            1 -> "Хорошее"
-            2 -> "Умеренное"
-            3 -> "Вредное для чувствительных"
-            4 -> "Вредное"
-            5 -> "Очень вредное"
-            else -> "Опасно"
+            1 -> context.getString(R.string.aqi_good)
+            2 -> context.getString(R.string.aqi_moderate)
+            3 -> context.getString(R.string.aqi_unhealthy_sensitive)
+            4 -> context.getString(R.string.aqi_unhealthy)
+            5 -> context.getString(R.string.aqi_very_unhealthy)
+            else -> context.getString(R.string.aqi_hazardous)
         }
     }
 
