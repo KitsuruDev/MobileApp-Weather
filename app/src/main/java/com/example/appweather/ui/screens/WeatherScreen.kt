@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -44,6 +45,9 @@ import kotlinx.coroutines.delay
 @Composable
 fun WeatherScreen(viewModel: WeatherViewModel) {
     val context = LocalContext.current
+    // используется, чтобы пересоздать Activity при смене языка
+    val activity = context as? AppCompatActivity
+
     val uiState by viewModel.uiState.collectAsState()
     val settings by viewModel.settings.collectAsState()
     val currentCity by viewModel.currentCity.collectAsState()
@@ -64,6 +68,15 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
     val locationPermissionState = rememberPermissionState(
         Manifest.permission.ACCESS_FINE_LOCATION
     )
+
+    // Пересоздание Activity при смене языка.
+    // ViewModel при recreate() переживает пересоздание, поэтому данные не потеряются,
+    // а attachBaseContext в MainActivity применит новую локаль ко всем строкам.
+    LaunchedEffect(Unit) {
+        viewModel.languageChanged.collect {
+            activity?.recreate()
+        }
+    }
 
     // при первом запуске экрана проверяется, есть ли разрешение на GPS
     LaunchedEffect(Unit) {
@@ -208,6 +221,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             favoriteCities.forEach { favCity ->
+                                // favCity не должно попадать в историю поиска — оставляем addToHistory = false
                                 AssistChip(
                                     onClick = { viewModel.loadWeatherByCity(favCity.name) },
                                     label = {
@@ -282,7 +296,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // ИСПРАВЛЕНО: используем weight(1f) для равномерного распределения
+                    // влажность + ветер
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         DetailItem(
                             stringResource(R.string.humidity),
@@ -330,9 +344,34 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                         )
                     }
 
+                    // --- НОВОЕ: min/max температура + вероятность осадков ---
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        DetailItem(
+                            stringResource(R.string.temp_min),
+                            today?.day?.tempMin?.let {
+                                WeatherUtils.formatTemp(it, settings.tempUnit)
+                            } ?: "--",
+                            modifier = Modifier.weight(1f)
+                        )
+                        DetailItem(
+                            stringResource(R.string.temp_max),
+                            today?.day?.tempMax?.let {
+                                WeatherUtils.formatTemp(it, settings.tempUnit)
+                            } ?: "--",
+                            modifier = Modifier.weight(1f)
+                        )
+                        DetailItem(
+                            stringResource(R.string.chance_of_rain),
+                            "${today?.day?.chanceOfRain ?: 0} %",
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // --- БЛОК ПОЧАСОВОГО ПРОГНОЗА ---
+                    // --- БЛОК ПОЧАСОВОГО ПРОГНОЗА (24 часа + горизонтальный скролл) ---
                     Text(
                         text = stringResource(R.string.hourly_forecast),
                         modifier = Modifier.align(Alignment.Start),
@@ -342,22 +381,29 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // вычисление часов ДО LazyRow (здесь remember разрешен)
+                    // Надёжный расчёт 24 часов: сравниваем только "yyyy-MM-dd HH"
                     val hoursToShow = remember(weather.current.lastUpdated, weather.forecast.forecastday) {
                         val allHours = weather.forecast.forecastday.flatMap { it.hour }
-                        allHours.dropWhile { it.time < weather.current.lastUpdated }.take(24)
+                        val currentHour = weather.current.lastUpdated.take(13) // "2026-11-18 14"
+                        allHours.filter { it.time.take(13) >= currentHour }.take(24)
                     }
 
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                        items(hoursToShow.size) { index ->
-                            val hourData = hoursToShow[index]
+                    // LazyRow по умолчанию поддерживает горизонтальную прокрутку
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(hoursToShow) { hourData ->
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 val timeString = hourData.time.substringAfter(" ")
                                 Text(
                                     text = WeatherUtils.formatTime(timeString, settings.timeFormat),
                                     style = MaterialTheme.typography.bodySmall
                                 )
-                                WeatherUtils.WeatherIcon(code = hourData.condition.code, modifier = Modifier.size(24.dp))
+                                WeatherUtils.WeatherIcon(
+                                    code = hourData.condition.code,
+                                    modifier = Modifier.size(24.dp)
+                                )
                                 Text(
                                     text = WeatherUtils.formatTemp(hourData.temperature, settings.tempUnit),
                                     fontWeight = FontWeight.Bold
@@ -462,7 +508,10 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
             searchResults = searchResults,
             searchHistory = searchHistory,
             onSearch = { query -> viewModel.searchCities(query) },
-            onCitySelected = { cityName -> viewModel.loadWeatherByCity(cityName) },
+            // ВАЖНО: addToHistory = true — в историю попадают только города из поиска
+            onCitySelected = { cityName ->
+                viewModel.loadWeatherByCity(cityName, addToHistory = true)
+            },
             onClearHistory = { viewModel.clearSearchHistory() },
             onDismiss = { showSearchDialog = false }
         )

@@ -11,7 +11,9 @@ import com.example.appweather.data.WeatherResponse
 import com.example.appweather.network.RetrofitClient
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -76,6 +78,10 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     private val _historyRequested = MutableStateFlow(false)
     val historyRequested = _historyRequested.asStateFlow()
 
+    // событие "сменился язык" — Activity по нему пересоздастся,
+    // чтобы attachBaseContext применил новый Locale ко всем stringResource
+    private val _languageChanged = MutableSharedFlow<Unit>()
+    val languageChanged = _languageChanged.asSharedFlow()
 
     init {
         // список избранного и история поиска загружаются в фоновом потоке, чтобы не блокировать UI
@@ -85,14 +91,12 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-
     // вывод города при первом открытии приложения
     fun initializeApp(hasGpsPermission: Boolean, context: Context) {
         // приложение уже загружено (например, эта функция вызвалась при смене языка)
         if (isInitialLoadDone) return
         isInitialLoadDone = true
 
-        // если есть разрешение GPS, то выведется город по GPS, иначе первый из избранных/по умолчанию
         if (hasGpsPermission) {
             fetchLocationAndWeather(context)
         } else {
@@ -102,12 +106,10 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
     // вывод города при открытии приложения
     fun loadFallbackWeather() {
-        // первый избранный город из памяти
         val prefs = getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
         val saved = prefs.getString("favorite_cities", "") ?: ""
         val firstFavorite = saved.split(",").firstOrNull { it.isNotBlank() }
 
-        // он есть избранный - загрузится, иначе Москва по умолчанию
         loadWeatherByCity(firstFavorite ?: "Москва")
     }
 
@@ -117,18 +119,22 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         newSettings.save(getApplication())
 
         if (languageChanged) {
-            loadWeatherByCity(currentCity.value)
+            // пересоздаём Activity — attachBaseContext подхватит новый язык из SharedPreferences
+            viewModelScope.launch {
+                _languageChanged.emit(Unit)
+            }
         }
+        loadWeatherByCity(currentCity.value)
     }
 
-    fun loadWeatherByCity(cityName: String) {
+    // addToHistory = true только при выборе города из результатов поиска
+    fun loadWeatherByCity(cityName: String, addToHistory: Boolean = false) {
         lastLoadWasGps = false
         _currentCity.value = cityName
 
         _historyRequested.value = false
         _historyData.value = null
 
-        // запуск фоновой задачи
         viewModelScope.launch {
             _uiState.value = WeatherUiState.Loading
             try {
@@ -137,7 +143,9 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                     lang = _settings.value.language
                 )
                 _currentCity.value = response.location.name
-                addToSearchHistory(response.location.name)
+                if (addToHistory) {
+                    addToSearchHistory(response.location.name)
+                }
                 _uiState.value = WeatherUiState.Success(response)
             } catch (e: Exception) {
                 _uiState.value = WeatherUiState.Error(
@@ -158,7 +166,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                     query = "$lat,$lon",
                     lang = _settings.value.language
                 )
-                _currentCity.value = response.location.name // API сам скажет, что это за город
+                _currentCity.value = response.location.name
                 _uiState.value = WeatherUiState.Success(response)
             } catch (e: Exception) {
                 _uiState.value = WeatherUiState.Error(
@@ -171,7 +179,6 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     // Получение GPS-локации
     @SuppressLint("MissingPermission")
     fun fetchLocationAndWeather(context: Context) {
-        // включение круговой загрузки на кнопке GPS
         _isGpsLoading.value = true
 
         viewModelScope.launch {
@@ -200,7 +207,6 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                     getApplication<Application>().getString(R.string.gps_exception, e.message ?: "")
                 )
             } finally {
-                // выключение круговой загрузки на кнопке GPS
                 _isGpsLoading.value = false
             }
         }
@@ -221,30 +227,26 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // загрузка истории поиска из памяти (теперь в IO-потоке)
-    private suspend fun loadSearchHistory() {
+    // загрузка истории поиска из памяти (в IO-потоке)
+    private fun loadSearchHistory() {
         val prefs = getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
         val saved = prefs.getString("search_history", "") ?: ""
         if (saved.isNotEmpty()) {
-            _searchHistory.value = saved.split("|") // | как разделитель, т.к. в названиях может быть запятая
+            _searchHistory.value = saved.split("|")
         }
     }
 
     // добавление города в историю поиска
     fun addToSearchHistory(cityName: String) {
         val current = _searchHistory.value.toMutableList()
-        // город уже есть в истории - его удаление, чтобы переместить его на первое место
         current.remove(cityName)
-        // добавление в начало
         current.add(0, cityName)
 
-        // только 5 последних
         if (current.size > 5) {
             current.removeAt(5)
         }
         _searchHistory.value = current
 
-        // сохранение
         val prefs = getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
         prefs.edit { putString("search_history", current.joinToString("|")) }
     }
@@ -273,7 +275,6 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
             val loadedCities = mutableListOf<FavoriteCity>()
             for (city in cityNames) {
                 try {
-                    // погода для каждого города
                     val response = RetrofitClient.api.getWeather(query = city, lang = _settings.value.language)
                     loadedCities.add(
                         FavoriteCity(
@@ -283,7 +284,6 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                         )
                     )
                 } catch (e: Exception) {
-                    // не удалось загрузить - пропуск
                 }
             }
             _favoriteCities.value = loadedCities
@@ -295,12 +295,10 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         val existingIndex = currentFavorites.indexOfFirst { it.name == cityName }
 
         if (existingIndex >= 0) {
-            // удаление из избранного
             currentFavorites.removeAt(existingIndex)
             _favoriteCities.value = currentFavorites
             saveFavoritesToPrefs()
         } else {
-            // добавление в избранное
             if (currentFavorites.size >= 10) {
                 _favoriteLimitReached.value = true
                 return
