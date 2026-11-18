@@ -1,8 +1,8 @@
 package com.example.appweather.notifications
 
 import android.content.Context
-import androidx.work.ExistingPeriodicWorkPolicy
-import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.ExistingWorkPolicy
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
@@ -11,7 +11,7 @@ object NotificationScheduler {
 
     private const val WORK_NAME = "daily_forecast_work"
 
-    // планирует ежедневный запуск в HH:mm
+    // Планирует ОДНОразовый запуск на ближайшее заданное время
     fun schedule(context: Context, time: String) {
         val (hour, minute) = parseTime(time)
 
@@ -28,14 +28,16 @@ object NotificationScheduler {
         }
         val initialDelayMs = target.timeInMillis - now.timeInMillis
 
-        val request = PeriodicWorkRequestBuilder<DailyForecastWorker>(24, TimeUnit.HOURS)
+        android.util.Log.d("NotificationScheduler", "schedule(): time=$time, initialDelayMs=$initialDelayMs")
+
+        val request = OneTimeWorkRequestBuilder<DailyForecastWorker>()
             .setInitialDelay(initialDelayMs, TimeUnit.MILLISECONDS)
             .build()
 
-        // UPDATE: если задача уже есть — пересоздаётся с новым временем
-        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+        // KEEP: если задача уже запланирована — не трогаем её
+        WorkManager.getInstance(context).enqueueUniqueWork(
             WORK_NAME,
-            ExistingPeriodicWorkPolicy.UPDATE,
+            ExistingWorkPolicy.KEEP,
             request
         )
     }
@@ -45,7 +47,7 @@ object NotificationScheduler {
         WorkManager.getInstance(context).cancelUniqueWork(WORK_NAME)
     }
 
-    // пересборка плана: отменить и заново поставить, если включено
+    // пересборка плана
     fun reschedule(context: Context, enabled: Boolean, time: String) {
         cancel(context)
         if (enabled) schedule(context, time)

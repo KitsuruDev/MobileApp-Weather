@@ -1,9 +1,11 @@
 package com.example.appweather.notifications
 
 import android.content.Context
+import android.content.res.Configuration
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.appweather.network.RetrofitClient
+import java.util.Locale
 
 class DailyForecastWorker(
     context: Context,
@@ -13,15 +15,29 @@ class DailyForecastWorker(
     override suspend fun doWork(): Result {
         return try {
             val prefs = applicationContext.getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
-            // текущий город сохраняется в prefs при каждой успешной загрузке в WeatherViewModel
             val city = prefs.getString("current_city", "Москва") ?: "Москва"
             val language = prefs.getString("language", "ru") ?: "ru"
+            val notificationTime = prefs.getString("notification_time", "08:00") ?: "08:00"
+
+            android.util.Log.d("DailyForecastWorker", "Worker started. City: $city, lang: $language")
+
+            // Создаём контекст с нужной локалью для правильного перевода
+            val config = Configuration(applicationContext.resources.configuration).apply {
+                setLocale(Locale(language))
+            }
+            val localizedContext = applicationContext.createConfigurationContext(config)
 
             val response = RetrofitClient.api.getWeather(query = city, lang = language)
-            NotificationHelper.showDailyForecast(applicationContext, response)
+
+            android.util.Log.d("DailyForecastWorker", "Weather loaded. Attempting to show notification.")
+            NotificationHelper.showDailyForecast(localizedContext, response)
+
+            // Планируем следующую задачу на завтра (после успешного показа)
+            NotificationScheduler.schedule(applicationContext, notificationTime)
+
             Result.success()
         } catch (e: Exception) {
-            // одна повторная попытка через стандартный backoff WorkManager (30 сек)
+            android.util.Log.e("DailyForecastWorker", "Error: ${e.message}", e)
             if (runAttemptCount < 3) Result.retry() else Result.failure()
         }
     }

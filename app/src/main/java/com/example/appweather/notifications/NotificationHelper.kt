@@ -78,6 +78,7 @@ object NotificationHelper {
             .build()
 
         try {
+            android.util.Log.d("NotificationHelper", "Showing notification for ${weather.location.name}")
             NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
         } catch (e: SecurityException) {
             // разрешение могли отозвать между проверкой и вызовом — молча игнорируем

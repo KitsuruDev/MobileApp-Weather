@@ -13,6 +13,25 @@ import com.example.appweather.R
 import com.example.appweather.data.AppSettings
 import androidx.compose.foundation.layout.FlowRow
 
+// форматирует "HH:mm" для отображения на кнопке с учётом настроек
+private fun formatNotificationTime(time24: String, timeFormat: String): String {
+    if (timeFormat != "12h") return time24
+    return try {
+        val parts = time24.split(":")
+        val h = parts[0].toInt()
+        val m = parts[1].toInt()
+        val amPm = if (h < 12) "AM" else "PM"
+        val h12 = when {
+            h == 0 -> 12
+            h > 12 -> h - 12
+            else -> h
+        }
+        "%02d:%02d %s".format(h12, m, amPm)
+    } catch (e: Exception) {
+        time24
+    }
+}
+
 @Composable
 fun SettingsDialog(
     currentSettings: AppSettings,
@@ -137,16 +156,20 @@ fun SettingsDialog(
                                 val parts = notificationTime.split(":")
                                 val h = parts.getOrNull(0)?.toIntOrNull() ?: 8
                                 val m = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                                // is24HourView = false, если выбран 12-часовой формат
                                 TimePickerDialog(
                                     context,
                                     { _, pickedH, pickedM ->
+                                        // onTimeSet всегда возвращает часы 0..23 — сохраняем в 24-часовом
                                         notificationTime = "%02d:%02d".format(pickedH, pickedM)
                                     },
-                                    h, m, true
+                                    h, m,
+                                    timeFormat != "12h"
                                 ).show()
                             }
                         ) {
-                            Text(notificationTime)
+                            // отображаем время с учётом выбранного формата
+                            Text(formatNotificationTime(notificationTime, timeFormat))
                         }
                     }
                 }
