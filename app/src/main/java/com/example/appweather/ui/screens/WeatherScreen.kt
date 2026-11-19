@@ -55,6 +55,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
     val favoriteCities by viewModel.favoriteCities.collectAsState()
     val favoriteLimitReached by viewModel.favoriteLimitReached.collectAsState()
     val isGpsLoading by viewModel.isGpsLoading.collectAsState()
+    val lastLoadWasGps by viewModel.lastLoadWasGps.collectAsState()
     val historyData by viewModel.historyData.collectAsState()
     val historyRequested by viewModel.historyRequested.collectAsState()
     val isHistoryLoading by viewModel.isHistoryLoading.collectAsState()
@@ -248,12 +249,24 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Icon(
-                            Icons.Default.LocationOn,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary
-                        )
+                        // Если город получен по GPS — показываем иконку GPS
+                        if (lastLoadWasGps) {
+                            Icon(
+                                imageVector = Icons.Default.MyLocation,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                         Text(text = currentCity, style = MaterialTheme.typography.titleLarge)
+
+                        // Индикатор загрузки (спиннер)
+                        if (isGpsLoading) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                        }
 
                         IconButton(onClick = { viewModel.toggleFavorite(currentCity) }) {
                             val isFavorite = favoriteCities.any { it.name == currentCity }
@@ -453,7 +466,9 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 
                     // строки таблицы
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        weather.forecast.forecastday.forEach { day ->
+                        // drop(1) пропускает сегодняшний день (он уже показан наверху),
+                        // take(7) берёт максимум 7 дней
+                        weather.forecast.forecastday.drop(1).take(7).forEach { day ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 4.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -608,37 +623,69 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                 }
 
                 if (historyRequested) {
-                    if (historyData != null) {
-                        val histDay = historyData?.forecast?.forecastday?.firstOrNull()
+                    val histDays = historyData
+                    if (!histDays.isNullOrEmpty()) {
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                         ) {
-                            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
                                 Text(
-                                    stringResource(R.string.yesterday_weather_title),
-                                    fontWeight = FontWeight.Bold
+                                    stringResource(R.string.history_week_title),
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleMedium
                                 )
 
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    WeatherUtils.WeatherIcon(
-                                        code = histDay?.day?.condition?.code ?: 1000,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "${WeatherUtils.formatTemp(histDay?.day?.tempMax ?: 0.0, settings.tempUnit)} / ${WeatherUtils.formatTemp(histDay?.day?.tempMin ?: 0.0, settings.tempUnit)}",
-                                        fontWeight = FontWeight.Bold,
-                                        style = MaterialTheme.typography.titleMedium
-                                    )
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 300.dp)
+                                        .verticalScroll(rememberScrollState()),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    histDays.forEach { histDay ->
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                text = histDay.date.substring(5),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                modifier = Modifier.width(50.dp)
+                                            )
+
+                                            Box(
+                                                modifier = Modifier.weight(1f),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    WeatherUtils.WeatherIcon(
+                                                        code = histDay.day.condition.code,
+                                                        modifier = Modifier.size(24.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = histDay.day.condition.text,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        maxLines = 1,
+                                                        overflow = TextOverflow.Ellipsis
+                                                    )
+                                                }
+                                            }
+
+                                            Text(
+                                                text = "${WeatherUtils.formatTemp(histDay.day.tempMin, settings.tempUnit)} " +
+                                                        "/ ${WeatherUtils.formatTemp(histDay.day.tempMax, settings.tempUnit)}",
+                                                fontWeight = FontWeight.Bold,
+                                                style = MaterialTheme.typography.bodyMedium
+                                            )
+                                        }
+                                        HorizontalDivider()
+                                    }
                                 }
-
-                                Text("${stringResource(R.string.weather_label)} ${histDay?.day?.condition?.text ?: "--"}")
-                                Text("${stringResource(R.string.humidity_label)} ${histDay?.day?.avgHumidity ?: "--"} %")
-                                Text("${stringResource(R.string.wind_label)} ${histDay?.day?.maxWindKmh?.let { WeatherUtils.formatWind(context, it, settings.windUnit) } ?: "--"}")
-
-                                val histPressure = historyData?.forecast?.forecastday?.firstOrNull()?.hour?.firstOrNull()?.pressure
-                                Text("${stringResource(R.string.pressure_label)} ${histPressure?.let { WeatherUtils.formatPressure(context, it, settings.pressureUnit) } ?: "--"}")
                             }
                         }
                     } else if (!isHistoryLoading) {

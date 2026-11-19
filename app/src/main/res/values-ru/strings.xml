@@ -118,4 +118,13 @@
     <string name="severe_uv">Очень высокий УФ</string>
     <string name="severe_heat">Экстремальная жара</string>
     <string name="severe_cold">Сильный мороз</string>
+
+    <string name="history_week_title">Погода за прошлую неделю</string>
+    <string name="refresh_frequency">Частота обновления</string>
+    <string name="interval_15">15 мин</string>
+    <string name="interval_30">30 мин</string>
+    <string name="interval_60">60 мин</string>
+    <string name="gps_accuracy">Точность GPS</string>
+    <string name="accuracy_high">Высокая (GPS)</string>
+    <string name="accuracy_eco">Экономичная</string>
 </resources>

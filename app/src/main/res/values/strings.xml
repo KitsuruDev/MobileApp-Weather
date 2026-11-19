@@ -118,4 +118,13 @@
     <string name="severe_uv">Very high UV</string>
     <string name="severe_heat">Extreme heat</string>
     <string name="severe_cold">Severe frost</string>
+
+    <string name="history_week_title">Past week weather</string>
+    <string name="refresh_frequency">Refresh frequency</string>
+    <string name="interval_15">15 min</string>
+    <string name="interval_30">30 min</string>
+    <string name="interval_60">60 min</string>
+    <string name="gps_accuracy">GPS accuracy</string>
+    <string name="accuracy_high">High (GPS)</string>
+    <string name="accuracy_eco">Economical</string>
 </resources>

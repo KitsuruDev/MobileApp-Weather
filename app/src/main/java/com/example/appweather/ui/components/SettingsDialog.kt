@@ -22,6 +22,7 @@ fun SettingsDialog(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+
     var tempUnit by remember { mutableStateOf(currentSettings.tempUnit) }
     var windUnit by remember { mutableStateOf(currentSettings.windUnit) }
     var pressureUnit by remember { mutableStateOf(currentSettings.pressureUnit) }
@@ -29,7 +30,8 @@ fun SettingsDialog(
     var timeFormat by remember { mutableStateOf(currentSettings.timeFormat) }
     var notificationsEnabled by remember { mutableStateOf(currentSettings.notificationsEnabled) }
     var notificationTime by remember { mutableStateOf(currentSettings.notificationTime) }
-
+    var refreshInterval by remember { mutableIntStateOf(currentSettings.refreshIntervalMinutes) }
+    var gpsHighAccuracy by remember { mutableStateOf(currentSettings.gpsHighAccuracy) }
     var weatherChangeEnabled by remember { mutableStateOf(currentSettings.weatherChangeNotificationsEnabled) }
     var severeWeatherEnabled by remember { mutableStateOf(currentSettings.severeWeatherNotificationsEnabled) }
     var movementEnabled by remember { mutableStateOf(currentSettings.movementNotificationsEnabled) }
@@ -112,6 +114,39 @@ fun SettingsDialog(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
+
+                // Частота обновления
+                Text(stringResource(R.string.refresh_frequency), style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = refreshInterval == 15, onClick = { refreshInterval = 15 })
+                        Text(stringResource(R.string.interval_15))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = refreshInterval == 30, onClick = { refreshInterval = 30 })
+                        Text(stringResource(R.string.interval_30))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = refreshInterval == 60, onClick = { refreshInterval = 60 })
+                        Text(stringResource(R.string.interval_60))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Точность GPS
+                Text(stringResource(R.string.gps_accuracy), style = MaterialTheme.typography.titleSmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = gpsHighAccuracy, onClick = { gpsHighAccuracy = true })
+                        Text(stringResource(R.string.accuracy_high))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = !gpsHighAccuracy, onClick = { gpsHighAccuracy = false })
+                        Text(stringResource(R.string.accuracy_eco))
+                    }
+                }
+
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -225,7 +260,9 @@ fun SettingsDialog(
                         notificationTime = notificationTime,
                         weatherChangeNotificationsEnabled = weatherChangeEnabled,
                         severeWeatherNotificationsEnabled = severeWeatherEnabled,
-                        movementNotificationsEnabled = movementEnabled
+                        movementNotificationsEnabled = movementEnabled,
+                        refreshIntervalMinutes = refreshInterval,
+                        gpsHighAccuracy = gpsHighAccuracy
                     )
                 )
                 onDismiss()
