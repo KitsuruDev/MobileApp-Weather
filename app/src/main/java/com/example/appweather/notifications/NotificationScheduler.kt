@@ -49,7 +49,7 @@ object NotificationScheduler {
     // ===== УМНЫЕ УВЕДОМЛЕНИЯ (изменение погоды + плохие условия) =====
 
     fun scheduleAlerts(context: Context) {
-        val request = PeriodicWorkRequestBuilder<WeatherAlertWorker>(4, TimeUnit.HOURS)
+        val request = PeriodicWorkRequestBuilder<WeatherAlertWorker>(30, TimeUnit.MINUTES)
             .build()
 
         // UPDATE позволяет при повторном вызове просто продлить существующее расписание

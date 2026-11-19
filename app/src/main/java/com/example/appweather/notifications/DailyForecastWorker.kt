@@ -15,7 +15,7 @@ class DailyForecastWorker(
     override suspend fun doWork(): Result {
         return try {
             val prefs = applicationContext.getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
-            val city = prefs.getString("current_city", "Москва") ?: "Москва"
+            val city = NotificationHelper.resolveNotificationCity(applicationContext)
             val language = prefs.getString("language", "ru") ?: "ru"
             val notificationTime = prefs.getString("notification_time", "08:00") ?: "08:00"
 

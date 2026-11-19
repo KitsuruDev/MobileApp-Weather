@@ -115,9 +115,19 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     // вывод города при открытии приложения
     fun loadFallbackWeather() {
         val prefs = getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
+
+        // последний открытый город (сохраняется при каждой успешной загрузке)
+        val lastOpened = prefs.getString("last_weather_city", null)
+        if (!lastOpened.isNullOrBlank()) {
+            loadWeatherByCity(lastOpened)
+            return
+        }
+
+        // первый избранный
         val saved = prefs.getString("favorite_cities", "") ?: ""
         val firstFavorite = saved.split(",").firstOrNull { it.isNotBlank() }
 
+        // Москва по умолчанию
         loadWeatherByCity(firstFavorite ?: "Москва")
     }
 
@@ -176,6 +186,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                     .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
                     .edit {
                         putString("current_city", response.location.name)
+                        putString("last_weather_city", response.location.name)
                         putFloat("last_weather_temp", response.current.temperature.toFloat())
                         putInt("last_weather_condition", response.current.condition.code)
                     }
@@ -214,9 +225,10 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                     .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
                 prefs.edit {
                     putString("current_city", newCity)
+                    putString("last_weather_city", newCity)
                     putFloat("last_weather_temp", response.current.temperature.toFloat())
                     putInt("last_weather_condition", response.current.condition.code)
-                    putString("last_gps_city", newCity)  // ← отдельный ключ
+                    putString("last_gps_city", newCity)
                 }
 
                 _uiState.value = WeatherUiState.Success(response)

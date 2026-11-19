@@ -32,22 +32,46 @@ object NotificationHelper {
     const val EXTRA_CITY = "extra_city"
 
     fun createChannels(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = context.getSystemService(NotificationManager::class.java)
-            manager?.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL_ID_DAILY,
-                    context.getString(R.string.notification_channel_name),
-                    NotificationManager.IMPORTANCE_DEFAULT
-                ).apply { description = context.getString(R.string.notification_channel_description) }
-            )
-            manager?.createNotificationChannel(
-                NotificationChannel(
-                    CHANNEL_ID_ALERTS,
-                    context.getString(R.string.alerts_channel_name),
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply { description = context.getString(R.string.alerts_channel_description) }
-            )
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager?.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_ID_DAILY,
+                context.getString(R.string.notification_channel_name),
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply { description = context.getString(R.string.notification_channel_description) }
+        )
+        manager?.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_ID_ALERTS,
+                context.getString(R.string.alerts_channel_name),
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply { description = context.getString(R.string.alerts_channel_description) }
+        )
+    }
+
+    // Единая точка определения города для уведомлений.
+    // Учитывает GPS-разрешение: если оно выдано — используем физическое местоположение,
+    // иначе — цепочку fallback (последний открытый → первый избранный → Москва).
+    fun resolveNotificationCity(context: Context): String {
+        val prefs = context.getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
+        val hasGps = ContextCompat.checkSelfPermission(
+            context, Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+
+        return if (hasGps) {
+            // при наличии GPS — последний известный GPS-город
+            prefs.getString("last_gps_city", null)
+                ?: prefs.getString("current_city", "Москва")
+                ?: "Москва"
+        } else {
+            // fallback-цепочка
+            val lastOpened = prefs.getString("last_weather_city", null)
+            if (!lastOpened.isNullOrBlank()) {
+                lastOpened
+            } else {
+                val favorites = prefs.getString("favorite_cities", "") ?: ""
+                favorites.split(",").firstOrNull { it.isNotBlank() } ?: "Москва"
+            }
         }
     }
 
