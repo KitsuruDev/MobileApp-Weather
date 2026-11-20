@@ -3,6 +3,7 @@ package com.example.appweather.viewmodel
 import android.annotation.SuppressLint
 import android.app.Application
 import android.content.Context
+import android.content.res.Configuration
 import androidx.core.content.edit
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,6 +14,7 @@ import com.example.appweather.data.ForecastDay
 import com.example.appweather.data.SearchLocation
 import com.example.appweather.data.WeatherResponse
 import com.example.appweather.network.RetrofitClient
+import com.example.appweather.notifications.NotificationHelper
 import com.example.appweather.notifications.NotificationScheduler
 import com.google.android.gms.location.LocationServices
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +27,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
+import kotlin.time.Duration.Companion.milliseconds
 
 sealed interface WeatherUiState {
     object Loading : WeatherUiState
@@ -45,7 +48,6 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     private val _isGpsLoading = MutableStateFlow(false)
     val isGpsLoading = _isGpsLoading.asStateFlow()
 
-    // теперь StateFlow — Compose видит изменения и показывает иконку GPS у названия города
     private val _lastLoadWasGps = MutableStateFlow(false)
     val lastLoadWasGps = _lastLoadWasGps.asStateFlow()
 
@@ -78,6 +80,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
     private var refreshJob: Job? = null
 
+
     init {
         viewModelScope.launch(Dispatchers.IO) {
             loadFavoriteCities()
@@ -85,16 +88,16 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // ===== АВТООБНОВЛЕНИЕ =====
 
     fun startAutoRefresh() {
         refreshJob?.cancel()
         val interval = _settings.value.refreshIntervalMinutes
-        if (interval <= 0) return  // «вручную» — не запускаем
+        if (interval <= 0) // если вдруг 0 и меньше - обновление не запускается
+            return
 
         refreshJob = viewModelScope.launch {
             while (true) {
-                delay(interval * 60_000L)
+                delay((interval * 60_000L).milliseconds)
                 if (_uiState.value is WeatherUiState.Success) {
                     loadWeatherByCity(_currentCity.value)
                 }
@@ -102,13 +105,13 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // ===== ЖИЗНЕННЫЙ ЦИКЛ =====
-
     fun initializeApp(hasGpsPermission: Boolean, context: Context) {
-        if (isInitialLoadDone) return
+        if (isInitialLoadDone)
+            return
+
         isInitialLoadDone = true
 
-        startAutoRefresh()  // ← запуск таймера при первом открытии
+        startAutoRefresh()
 
         if (hasGpsPermission) {
             fetchLocationAndWeather(context)
@@ -117,11 +120,9 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // Цепочка fallback при отсутствии GPS:
-    // 1) последний открытый город, 2) первый избранный, 3) Москва
+    // цепочка при отсутствии GPS: последний открытый город -> первый избранный -> Москва
     fun loadFallbackWeather() {
-        val prefs = getApplication<Application>()
-            .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
+        val prefs = getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
 
         val lastOpened = prefs.getString("last_weather_city", null)
         if (!lastOpened.isNullOrBlank()) {
@@ -140,11 +141,10 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         loadWeatherByCity(cityName)
     }
 
-    // ===== НАСТРОЙКИ =====
-
     fun updateSettings(newSettings: AppSettings) {
         val prev = _settings.value
         val languageChanged = prev.language != newSettings.language
+
         _settings.value = newSettings
         newSettings.save(getApplication())
 
@@ -162,27 +162,25 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
             )
         }
 
-        val alertsShouldRun = newSettings.weatherChangeNotificationsEnabled ||
-                newSettings.severeWeatherNotificationsEnabled
-        val alertsWereOn = prev.weatherChangeNotificationsEnabled ||
-                prev.severeWeatherNotificationsEnabled
+        val alertsShouldRun = newSettings.weatherChangeNotificationsEnabled || newSettings.severeWeatherNotificationsEnabled
+        val alertsWereOn = prev.weatherChangeNotificationsEnabled || prev.severeWeatherNotificationsEnabled
         if (alertsShouldRun != alertsWereOn) {
             NotificationScheduler.rescheduleAlerts(getApplication(), alertsShouldRun)
         }
 
-        // Запоминаем статус GPS, чтобы он не сбросился при обновлении экрана
+        // фиксация статуса GPS, чтобы он не сбросился при обновлении экрана
         val wasGps = _lastLoadWasGps.value
 
         if (languageChanged) {
-            viewModelScope.launch { _languageChanged.emit(Unit) }
+            viewModelScope.launch {
+                _languageChanged.emit(Unit) // оповещение, что состояние языка поменялось, все подписанные элементы обновятся
+            }
         }
+
         loadWeatherByCity(currentCity.value)
 
-        // Восстанавливаем статус GPS (если город был получен по GPS, иконка останется)
         _lastLoadWasGps.value = wasGps
     }
-
-    // ===== ЗАГРУЗКА ПОГОДЫ =====
 
     fun loadWeatherByCity(cityName: String, addToHistory: Boolean = false) {
         _lastLoadWasGps.value = false
@@ -193,23 +191,25 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
         viewModelScope.launch {
             _uiState.value = WeatherUiState.Loading
+
             try {
                 val response = RetrofitClient.api.getWeather(
                     query = cityName,
                     lang = _settings.value.language
                 )
+
                 _currentCity.value = response.location.name
 
-                getApplication<Application>()
-                    .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
-                    .edit {
-                        putString("current_city", response.location.name)
-                        putString("last_weather_city", response.location.name)
-                        putFloat("last_weather_temp", response.current.temperature.toFloat())
-                        putInt("last_weather_condition", response.current.condition.code)
-                    }
+                getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE).edit {
+                    putString("current_city", response.location.name)
+                    putString("last_weather_city", response.location.name)
+                    putFloat("last_weather_temp", response.current.temperature.toFloat())
+                    putInt("last_weather_condition", response.current.condition.code)
+                }
 
-                if (addToHistory) addToSearchHistory(response.location.name)
+                if (addToHistory)
+                    addToSearchHistory(response.location.name)
+
                 _uiState.value = WeatherUiState.Success(response)
             } catch (e: Exception) {
                 _uiState.value = WeatherUiState.Error(
@@ -224,28 +224,24 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
 
         viewModelScope.launch {
             _uiState.value = WeatherUiState.Loading
+
             try {
-                val response = RetrofitClient.api.getWeather(
-                    query = "$lat,$lon",
-                    lang = _settings.value.language
-                )
+                val response = RetrofitClient.api.getWeather(query = "$lat,$lon", lang = _settings.value.language)
                 val newCity = response.location.name
 
                 detectMovement(newCity, response.current.temperature, response.current.condition.text)
 
                 _currentCity.value = newCity
 
-                getApplication<Application>()
-                    .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
-                    .edit {
-                        putString("current_city", newCity)
-                        putString("last_weather_city", newCity)
-                        putFloat("last_weather_temp", response.current.temperature.toFloat())
-                        putInt("last_weather_condition", response.current.condition.code)
-                        putString("last_gps_city", newCity)
-                        putFloat("last_gps_lat", lat.toFloat())
-                        putFloat("last_gps_lon", lon.toFloat())
-                    }
+                getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE).edit {
+                    putString("current_city", newCity)
+                    putString("last_weather_city", newCity)
+                    putFloat("last_weather_temp", response.current.temperature.toFloat())
+                    putInt("last_weather_condition", response.current.condition.code)
+                    putString("last_gps_city", newCity)
+                    putFloat("last_gps_lat", lat.toFloat())
+                    putFloat("last_gps_lon", lon.toFloat())
+                }
 
                 _uiState.value = WeatherUiState.Success(response)
             } catch (e: Exception) {
@@ -265,16 +261,21 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                 val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
 
                 // выбор точности по настройке: высокая (GPS) или экономичная (Wi-Fi/сеть)
-                val priority = if (_settings.value.gpsHighAccuracy) {
-                    com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY
-                } else {
-                    com.google.android.gms.location.Priority.PRIORITY_BALANCED_POWER_ACCURACY
-                }
+                val priority =
+                    if (_settings.value.gpsHighAccuracy)
+                        com.google.android.gms.location.Priority.PRIORITY_HIGH_ACCURACY
+                    else
+                        com.google.android.gms.location.Priority.PRIORITY_BALANCED_POWER_ACCURACY
 
+                // suspendCancellableCoroutine:
+                // 1) приостанавливает текущую корутину
+                // 2) передаёт объект continuation, через который вручную возобновляется корутина, когда результат готов
+                // 3) возвращает continuation.resume
                 val location = suspendCancellableCoroutine { continuation ->
+                    // возвращает Task<Location>, который нельзя использовать напрямую в корутине - нужны слушатели
                     fusedLocationClient.getCurrentLocation(priority, null)
-                        .addOnSuccessListener { loc -> continuation.resume(loc) }
-                        .addOnFailureListener { continuation.resume(null) }
+                        .addOnSuccessListener { loc -> continuation.resume(loc) } // есть координаты - возврат их
+                        .addOnFailureListener { continuation.resume(null) }       // если нет - возврат null
                 }
 
                 if (location != null) {
@@ -295,25 +296,24 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun detectMovement(newCity: String, temperature: Double, conditionText: String) {
-        if (!_settings.value.movementNotificationsEnabled) return
+        if (!_settings.value.movementNotificationsEnabled)
+            return
 
-        val prefs = getApplication<Application>()
-            .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
+        val prefs = getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
         val lastGpsCity = prefs.getString("last_gps_city", null) ?: return
-        if (lastGpsCity == newCity) return
+        if (lastGpsCity == newCity)
+            return
 
         val locale = java.util.Locale(_settings.value.language)
-        val config = android.content.res.Configuration(
-            getApplication<Application>().resources.configuration
-        ).apply { setLocale(locale) }
+        val config = Configuration(getApplication<Application>().resources.configuration).apply {
+            setLocale(locale)
+        }
         val localizedContext = getApplication<Application>().createConfigurationContext(config)
 
-        com.example.appweather.notifications.NotificationHelper.showMovement(
+        NotificationHelper.showMovement(
             localizedContext, newCity, temperature, conditionText, _settings.value.tempUnit
         )
     }
-
-    // ===== ПОИСК =====
 
     fun searchCities(query: String) {
         if (query.length < 2) {
@@ -329,30 +329,31 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private suspend fun loadSearchHistory() {
-        val prefs = getApplication<Application>()
-            .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
+    private fun loadSearchHistory() {
+        val prefs = getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
         val saved = prefs.getString("search_history", "") ?: ""
-        if (saved.isNotEmpty()) _searchHistory.value = saved.split("|")
+        if (saved.isNotEmpty())
+            _searchHistory.value = saved.split("|")
     }
 
     fun addToSearchHistory(cityName: String) {
         val current = _searchHistory.value.toMutableList()
         current.remove(cityName)
         current.add(0, cityName)
-        if (current.size > 5) current.removeAt(5)
+        if (current.size > 5)
+            current.removeAt(5)
         _searchHistory.value = current
 
-        getApplication<Application>()
-            .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
-            .edit { putString("search_history", current.joinToString("|")) }
+        getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE).edit {
+            putString("search_history", current.joinToString("|"))
+        }
     }
 
     fun clearSearchHistory() {
         _searchHistory.value = emptyList()
-        getApplication<Application>()
-            .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
-            .edit { remove("search_history") }
+        getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE).edit {
+            remove("search_history")
+        }
     }
 
     fun retryLastLoad(context: Context) {
@@ -363,11 +364,8 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    // ===== ИЗБРАННОЕ =====
-
     private suspend fun loadFavoriteCities() {
-        val prefs = getApplication<Application>()
-            .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
+        val prefs = getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
         val saved = prefs.getString("favorite_cities", "") ?: ""
         if (saved.isNotEmpty()) {
             val loadedCities = mutableListOf<FavoriteCity>()
@@ -416,15 +414,15 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun resetFavoriteLimitFlag() { _favoriteLimitReached.value = false }
-
-    private fun saveFavoritesToPrefs() {
-        getApplication<Application>()
-            .getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
-            .edit { putString("favorite_cities", _favoriteCities.value.joinToString(",") { it.name }) }
+    fun resetFavoriteLimitFlag() {
+        _favoriteLimitReached.value = false
     }
 
-    // ===== ИСТОРИЯ ПОГОДЫ (7 дней) =====
+    private fun saveFavoritesToPrefs() {
+        getApplication<Application>().getSharedPreferences("weather_settings", Context.MODE_PRIVATE).edit {
+            putString("favorite_cities", _favoriteCities.value.joinToString(",") { it.name })
+        }
+    }
 
     fun fetchHistory(cityName: String) {
         viewModelScope.launch {
@@ -446,9 +444,7 @@ class WeatherViewModel(application: Application) : AndroidViewModel(application)
                             lang = _settings.value.language
                         )
                         response.forecast.forecastday.firstOrNull()?.let { days.add(it) }
-                    } catch (e: Exception) {
-                        // пропускаем день, если API вернул ошибку
-                    }
+                    } catch (e: Exception) { }
                 }
                 _historyData.value = days
             } catch (e: Exception) {

@@ -21,24 +21,27 @@ class DailyForecastWorker(
 
             android.util.Log.d("DailyForecastWorker", "Worker started. City: $city, lang: $language")
 
-            // Создаём контекст с нужной локалью для правильного перевода
-            val config = Configuration(applicationContext.resources.configuration).apply {
-                setLocale(Locale(language))
-            }
+            // контекст с нужной локалью для правильного перевода
+            val config = Configuration(applicationContext.resources.configuration).apply { setLocale(Locale(language)) }
             val localizedContext = applicationContext.createConfigurationContext(config)
 
             val response = RetrofitClient.api.getWeather(query = city, lang = language)
 
             android.util.Log.d("DailyForecastWorker", "Weather loaded. Attempting to show notification.")
+
             NotificationHelper.showDailyForecast(localizedContext, response)
 
-            // Планируем следующую задачу на завтра (после успешного показа)
+            // планировка следующей задачи на завтра
             NotificationScheduler.schedule(applicationContext, notificationTime)
 
             Result.success()
         } catch (e: Exception) {
             android.util.Log.e("DailyForecastWorker", "Error: ${e.message}", e)
-            if (runAttemptCount < 3) Result.retry() else Result.failure()
+
+            if (runAttemptCount < 3)
+                Result.retry()
+            else
+                Result.failure()
         }
     }
 }

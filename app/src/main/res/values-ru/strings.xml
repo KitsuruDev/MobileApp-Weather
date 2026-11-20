@@ -60,8 +60,8 @@
     <string name="moon_waning_gibbous">Убывающая луна</string>
     <string name="moon_last_quarter">Последняя четверть</string>
     <string name="moon_waning_crescent">Убывающий серп</string>
-    <string name="temp_min">Мин.</string>
-    <string name="temp_max">Макс.</string>
+    <string name="temp_min">Мин. температура</string>
+    <string name="temp_max">Макс. температура</string>
     <string name="chance_of_rain">Осадки</string>
     <string name="details_title">Детали погоды</string>
     <string name="details_content_desc">Подробная информация</string>

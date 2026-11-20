@@ -60,8 +60,8 @@
     <string name="moon_waning_gibbous">Waning Gibbous</string>
     <string name="moon_last_quarter">Last Quarter</string>
     <string name="moon_waning_crescent">Waning Crescent</string>
-    <string name="temp_min">Min</string>
-    <string name="temp_max">Max</string>
+    <string name="temp_min">Min temp</string>
+    <string name="temp_max">Max temp</string>
     <string name="chance_of_rain">Rain</string>
     <string name="details_title">Weather details</string>
     <string name="details_content_desc">Details</string>

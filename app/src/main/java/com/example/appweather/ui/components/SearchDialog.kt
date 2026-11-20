@@ -74,7 +74,13 @@ fun SearchDialog(
                             items(searchHistory) { historyCity ->
                                 ListItem(
                                     headlineContent = { Text(historyCity) },
-                                    leadingContent = { Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.outline) },
+                                    leadingContent = {
+                                        Icon(
+                                            Icons.Default.History,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.outline
+                                        )
+                                    },
                                     modifier = Modifier.clickable {
                                         onCitySelected(historyCity)
                                         onDismiss()

@@ -16,7 +16,6 @@ class WeatherAlertWorker(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result {
-        android.util.Log.d("WeatherAlertWorker", "doWork() STARTED")
         return try {
             val prefs = applicationContext.getSharedPreferences("weather_settings", Context.MODE_PRIVATE)
             val language = prefs.getString("language", "ru") ?: "ru"
@@ -25,34 +24,32 @@ class WeatherAlertWorker(
             val severeEnabled = prefs.getBoolean("severe_weather_notifications_enabled", false)
             val changeEnabled = prefs.getBoolean("weather_change_notifications_enabled", false)
             if (!severeEnabled && !changeEnabled) {
-                android.util.Log.d("WeatherAlertWorker", "Both flags disabled, exiting.")
                 return Result.success()
             }
 
-            // определяем город с учётом GPS
+            // определение города с учётом GPS
             val cityBefore = NotificationHelper.resolveNotificationCity(applicationContext)
+
             android.util.Log.d("WeatherAlertWorker", "Resolved city: $cityBefore")
 
-            val config = Configuration(applicationContext.resources.configuration).apply {
-                setLocale(Locale(language))
-            }
+            val config = Configuration(applicationContext.resources.configuration).apply { setLocale(Locale(language)) }
             val localizedContext = applicationContext.createConfigurationContext(config)
 
             val response = RetrofitClient.api.getWeather(query = cityBefore, lang = language)
             val current = response.current
             val realCity = response.location.name
 
-            // если город сменился, пока шёл запрос — не показываем уведомление
+            // если город сменился, пока шёл запрос - уведомление не выводится
             val cityAfter = NotificationHelper.resolveNotificationCity(applicationContext)
             if (cityAfter.isNotBlank() && cityAfter != cityBefore) {
                 android.util.Log.d(
                     "WeatherAlertWorker",
-                    "City changed during fetch ($cityBefore → $cityAfter), skipping"
+                    "City changed during fetch ($cityBefore - $cityAfter), skipping"
                 )
                 return Result.success()
             }
 
-            // --- ПЛОХИЕ УСЛОВИЯ (с дедупликацией) ---
+            // плохие условия (повтор - раз в 6 часов или если тип опасной погоды поменялся)
             if (severeEnabled) {
                 val alert = detectSevere(current, localizedContext)
                 val lastAlert = prefs.getString("last_severe_alert", null)
@@ -77,7 +74,7 @@ class WeatherAlertWorker(
                 }
             }
 
-            // --- ИЗМЕНЕНИЕ ПОГОДЫ (только если снимок от того же города) ---
+            // изменение погоды в текущем городе
             if (changeEnabled) {
                 val lastCity = prefs.getString("last_weather_city", null)
                 val lastTemp = prefs.getFloat("last_weather_temp", Float.NaN)
@@ -90,8 +87,7 @@ class WeatherAlertWorker(
 
                 if (lastCity == realCity && !lastTemp.isNaN()) {
                     val deltaTemp = abs(current.temperature - lastTemp)
-                    val conditionChanged =
-                        lastConditionCode != -1 && lastConditionCode != current.condition.code
+                    val conditionChanged = lastConditionCode != -1 && lastConditionCode != current.condition.code
 
                     if (deltaTemp >= 5.0 || conditionChanged) {
                         NotificationHelper.showWeatherChange(
@@ -106,7 +102,7 @@ class WeatherAlertWorker(
                 }
             }
 
-            // обновляем снимок — следующий запуск будет сравнивать с текущим состоянием
+            // следующий запуск будет сравнение с текущим состоянием
             prefs.edit {
                 putString("last_weather_city", realCity)
                 putFloat("last_weather_temp", current.temperature.toFloat())

@@ -40,61 +40,71 @@ fun SettingsDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.settings)) },
         text = {
-            // Добавлен verticalScroll, чтобы окно прокручивалось при нехватке высоты
+            // verticalScroll - окно будет прокручиваться при нехватке высоты
             Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                // Язык
+                // язык
                 Text(stringResource(R.string.language), style = MaterialTheme.typography.titleSmall)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = language == "ru", onClick = { language = "ru" })
                     Text(stringResource(R.string.russian))
+
                     Spacer(modifier = Modifier.width(16.dp))
+
                     RadioButton(selected = language == "en", onClick = { language = "en" })
                     Text(stringResource(R.string.english))
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Температура
+                // температура
                 Text(stringResource(R.string.temperature), style = MaterialTheme.typography.titleSmall)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = tempUnit == "C", onClick = { tempUnit = "C" })
                     Text(stringResource(R.string.celsius))
+
                     Spacer(modifier = Modifier.width(16.dp))
+
                     RadioButton(selected = tempUnit == "F", onClick = { tempUnit = "F" })
                     Text(stringResource(R.string.fahrenheit))
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Скорость ветра
+                // скорость ветра
+                // FlowRow - чтобы дочерние элементы не ужимались, а переносились на новую строку
                 Text(stringResource(R.string.wind_speed), style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = windUnit == "kmh", onClick = { windUnit = "kmh" })
                         Text(stringResource(R.string.label_kmh))
                     }
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = windUnit == "ms", onClick = { windUnit = "ms" })
                         Text(stringResource(R.string.label_ms))
                     }
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = windUnit == "mph", onClick = { windUnit = "mph" })
                         Text(stringResource(R.string.label_mph))
                     }
                 }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Давление
+                // давление
                 Text(stringResource(R.string.pressure), style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = pressureUnit == "hPa", onClick = { pressureUnit = "hPa" })
                         Text(stringResource(R.string.label_hpa))
                     }
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = pressureUnit == "mmHg", onClick = { pressureUnit = "mmHg" })
                         Text(stringResource(R.string.label_mmhg))
                     }
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = pressureUnit == "inHg", onClick = { pressureUnit = "inHg" })
                         Text(stringResource(R.string.label_inhg))
@@ -103,29 +113,33 @@ fun SettingsDialog(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Формат времени
+                // формат времени
                 Text(stringResource(R.string.time_format), style = MaterialTheme.typography.titleSmall)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     RadioButton(selected = timeFormat == "24h", onClick = { timeFormat = "24h" })
                     Text(stringResource(R.string.time_24h))
+
                     Spacer(modifier = Modifier.width(16.dp))
+
                     RadioButton(selected = timeFormat == "12h", onClick = { timeFormat = "12h" })
                     Text(stringResource(R.string.time_12h))
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Частота обновления
+                // частота обновления погоды
                 Text(stringResource(R.string.refresh_frequency), style = MaterialTheme.typography.titleSmall)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = refreshInterval == 15, onClick = { refreshInterval = 15 })
                         Text(stringResource(R.string.interval_15))
                     }
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = refreshInterval == 30, onClick = { refreshInterval = 30 })
                         Text(stringResource(R.string.interval_30))
                     }
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = refreshInterval == 60, onClick = { refreshInterval = 60 })
                         Text(stringResource(R.string.interval_60))
@@ -141,6 +155,7 @@ fun SettingsDialog(
                         RadioButton(selected = gpsHighAccuracy, onClick = { gpsHighAccuracy = true })
                         Text(stringResource(R.string.accuracy_high))
                     }
+
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = !gpsHighAccuracy, onClick = { gpsHighAccuracy = false })
                         Text(stringResource(R.string.accuracy_eco))
@@ -148,22 +163,17 @@ fun SettingsDialog(
                 }
 
                 HorizontalDivider()
+
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Ежедневный прогноз в уведомлении
+                // ежедневный прогноз в уведомлении
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        stringResource(R.string.daily_notification),
-                        style = MaterialTheme.typography.titleSmall
-                    )
-                    Switch(
-                        checked = notificationsEnabled,
-                        onCheckedChange = { notificationsEnabled = it }
-                    )
+                    Text(stringResource(R.string.daily_notification), style = MaterialTheme.typography.titleSmall)
+                    Switch(checked = notificationsEnabled, onCheckedChange = { notificationsEnabled = it })
                 }
 
                 if (notificationsEnabled) {
@@ -182,6 +192,7 @@ fun SettingsDialog(
                                 TimePickerDialog(
                                     context,
                                     { _, pickedH, pickedM ->
+                                        // "%02d:%02d" - добавление ведущего нуля, если число меньше 10
                                         notificationTime = "%02d:%02d".format(pickedH, pickedM)
                                     },
                                     h, m,
@@ -195,14 +206,13 @@ fun SettingsDialog(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
+
                 HorizontalDivider()
+
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Умные уведомления
-                Text(
-                    stringResource(R.string.smart_notifications),
-                    style = MaterialTheme.typography.titleSmall
-                )
+                // Расширенные уведомления
+                Text(stringResource(R.string.smart_notifications), style = MaterialTheme.typography.titleSmall)
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -210,10 +220,7 @@ fun SettingsDialog(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(stringResource(R.string.weather_change_toggle))
-                    Switch(
-                        checked = weatherChangeEnabled,
-                        onCheckedChange = { weatherChangeEnabled = it }
-                    )
+                    Switch(checked = weatherChangeEnabled, onCheckedChange = { weatherChangeEnabled = it })
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -221,17 +228,14 @@ fun SettingsDialog(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(stringResource(R.string.severe_weather_toggle))
-                    Switch(
-                        checked = severeWeatherEnabled,
-                        onCheckedChange = { severeWeatherEnabled = it }
-                    )
+                    Switch(checked = severeWeatherEnabled, onCheckedChange = { severeWeatherEnabled = it })
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Колонка с текстом занимает всё доступное место, Switch жмётся вправо
+                    // weight(1f) - текст занимает всё доступное место, switch жмётся вправо
                     Column(modifier = Modifier.weight(1f).padding(end = 8.dp)) {
                         Text(stringResource(R.string.movement_toggle))
                         Text(
@@ -240,10 +244,7 @@ fun SettingsDialog(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Switch(
-                        checked = movementEnabled,
-                        onCheckedChange = { movementEnabled = it }
-                    )
+                    Switch(checked = movementEnabled,onCheckedChange = { movementEnabled = it })
                 }
             }
         },
@@ -278,9 +279,10 @@ fun SettingsDialog(
     )
 }
 
-// Вспомогательная функция для форматирования времени на кнопке
+// форматирование времени на кнопке
 private fun formatNotificationTime(time24: String, timeFormat: String): String {
-    if (timeFormat != "12h") return time24
+    if (timeFormat != "12h")
+        return time24
     return try {
         val parts = time24.split(":")
         val h = parts[0].toInt()

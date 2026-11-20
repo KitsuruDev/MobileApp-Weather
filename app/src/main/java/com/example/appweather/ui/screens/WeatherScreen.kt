@@ -44,8 +44,7 @@ import com.google.accompanist.permissions.rememberPermissionState
 @Composable
 fun WeatherScreen(viewModel: WeatherViewModel) {
     val context = LocalContext.current
-    // используется, чтобы пересоздать Activity при смене языка
-    val activity = context as? AppCompatActivity
+    val activity = context as? AppCompatActivity // чтобы пересоздать Activity при смене языка
 
     val uiState by viewModel.uiState.collectAsState()
     val settings by viewModel.settings.collectAsState()
@@ -65,19 +64,15 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
     var showDetailsSheet by remember { mutableStateOf(false) }
 
     // запрос GPS во время работы приложения
-    val locationPermissionState = rememberPermissionState(
-        Manifest.permission.ACCESS_FINE_LOCATION
-    )
+    val locationPermissionState = rememberPermissionState(Manifest.permission.ACCESS_FINE_LOCATION)
 
     val favoriteLimitMessage = stringResource(R.string.favorite_limit_reached)
     val mapAppNotFoundMessage = stringResource(R.string.map_app_not_found)
 
-    // Пересоздание Activity при смене языка.
-    // ViewModel при recreate() переживает пересоздание, поэтому данные не потеряются,
-    // а attachBaseContext в MainActivity применит новую локаль ко всем строкам.
+    // пересоздание Activity при смене языка
     LaunchedEffect(Unit) {
         viewModel.languageChanged.collect {
-            activity?.recreate()
+            activity?.recreate() // viewmodel не теряет данные при пересоздании
         }
     }
 
@@ -114,15 +109,9 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                         enabled = !isGpsLoading
                     ) {
                         if (isGpsLoading) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(24.dp),
-                                strokeWidth = 2.dp
-                            )
+                            CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
                         } else {
-                            Icon(
-                                Icons.Filled.MyLocation,
-                                contentDescription = stringResource(R.string.my_location)
-                            )
+                            Icon(Icons.Filled.MyLocation, contentDescription = stringResource(R.string.my_location))
                         }
                     }
 
@@ -220,21 +209,16 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             favoriteCities.forEach { favCity ->
-                                // favCity не должно попадать в историю поиска — оставляем addToHistory = false
                                 AssistChip(
                                     onClick = { viewModel.loadWeatherByCity(favCity.name) },
                                     label = {
                                         Text(
-                                            "${favCity.name} ${WeatherUtils.formatTemp(
-                                                favCity.temperature, settings.tempUnit
-                                            )}"
+                                            "${favCity.name} " +
+                                            "${WeatherUtils.formatTemp(favCity.temperature, settings.tempUnit)}"
                                         )
                                     },
                                     leadingIcon = {
-                                        WeatherUtils.WeatherIcon(
-                                            code = favCity.weatherCode,
-                                            modifier = Modifier.size(16.dp)
-                                        )
+                                        WeatherUtils.WeatherIcon(code = favCity.weatherCode, modifier = Modifier.size(16.dp))
                                     },
                                     shape = RoundedCornerShape(16.dp)
                                 )
@@ -249,27 +233,28 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // Если город получен по GPS — показываем иконку GPS
+                        // иконка, показывающая, что город был получен по GPS
                         if (lastLoadWasGps) {
                             Icon(
-                                imageVector = Icons.Default.MyLocation,
+                                imageVector = Icons.Default.LocationOn,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary
                             )
                         }
+
                         Text(text = currentCity, style = MaterialTheme.typography.titleLarge)
 
-                        // Индикатор загрузки (спиннер)
+                        // индикатор загрузки (спиннер)
                         if (isGpsLoading) {
                             Spacer(modifier = Modifier.width(8.dp))
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(16.dp),
-                                strokeWidth = 2.dp
-                            )
+
+                            CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         }
 
+                        // звёздочка для добавления в избранное
                         IconButton(onClick = { viewModel.toggleFavorite(currentCity) }) {
                             val isFavorite = favoriteCities.any { it.name == currentCity }
+
                             Icon(
                                 imageVector = if (isFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
                                 contentDescription = stringResource(R.string.favorite_content_desc),
@@ -280,7 +265,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // детали
+                    // температура
                     Text(
                         text = WeatherUtils.formatTemp(current.temperature, settings.tempUnit),
                         fontSize = 80.sp,
@@ -296,13 +281,13 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                         color = Color.Gray
                     )
 
+                    // погода
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         WeatherUtils.WeatherIcon(code = current.condition.code, modifier = Modifier.size(32.dp))
+
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = current.condition.text,
-                            style = MaterialTheme.typography.titleMedium
-                        )
+
+                        Text(text = current.condition.text, style = MaterialTheme.typography.titleMedium)
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -323,6 +308,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // давление + видимость
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         DetailItem(
                             stringResource(R.string.pressure),
@@ -338,6 +324,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    // восход + закат
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         DetailItem(
                             stringResource(R.string.sunrise),
@@ -355,7 +342,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                         )
                     }
 
-                    // --- НОВОЕ: min/max температура + вероятность осадков ---
+                    // min/max температура + вероятность осадков
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -382,7 +369,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    // --- БЛОК ПОЧАСОВОГО ПРОГНОЗА (24 часа + горизонтальный скролл) ---
+                    // почасовой прогноз - первые 24 часа
                     Text(
                         text = stringResource(R.string.hourly_forecast),
                         modifier = Modifier.align(Alignment.Start),
@@ -392,14 +379,14 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Надёжный расчёт 24 часов: сравниваем только "yyyy-MM-dd HH"
+                    // remember - пересчитывает значение только если изменилcя lastUpdated/прогноз
                     val hoursToShow = remember(weather.current.lastUpdated, weather.forecast.forecastday) {
-                        val allHours = weather.forecast.forecastday.flatMap { it.hour }
-                        val currentHour = weather.current.lastUpdated.take(13) // "2026-11-18 14"
-                        allHours.filter { it.time.take(13) >= currentHour }.take(24)
+                        val allHours = weather.forecast.forecastday.flatMap { it.hour } // почасовые массивы 7 дней в один список
+                        val currentHour = weather.current.lastUpdated.take(13) // обрезка времени - на выходе "yyyy-MM-dd HH"
+                        allHours.filter { it.time.take(13) > currentHour }.take(24) // первые 24 часа
                     }
 
-                    // LazyRow по умолчанию поддерживает горизонтальную прокрутку
+                    // LazyRow поддерживает горизонтальную прокрутку
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxWidth()
@@ -407,14 +394,20 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                         items(hoursToShow) { hourData ->
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 val timeString = hourData.time.substringAfter(" ")
+
+                                // время
                                 Text(
                                     text = WeatherUtils.formatTime(timeString, settings.timeFormat),
                                     style = MaterialTheme.typography.bodySmall
                                 )
+
+                                // погода
                                 WeatherUtils.WeatherIcon(
                                     code = hourData.condition.code,
                                     modifier = Modifier.size(24.dp)
                                 )
+
+                                // температура
                                 Text(
                                     text = WeatherUtils.formatTemp(hourData.temperature, settings.tempUnit),
                                     fontWeight = FontWeight.Bold
@@ -440,12 +433,15 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
+                        // дата
                         Text(
                             text = stringResource(R.string.forecast_date),
                             style = MaterialTheme.typography.labelLarge,
                             color = Color.Gray,
                             modifier = Modifier.weight(0.8f)
                         )
+
+                        // погода
                         Text(
                             text = stringResource(R.string.forecast_weather),
                             style = MaterialTheme.typography.labelLarge,
@@ -453,6 +449,8 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                             modifier = Modifier.weight(2f),
                             textAlign = TextAlign.Center
                         )
+
+                        // температура
                         Text(
                             text = stringResource(R.string.forecast_temp),
                             style = MaterialTheme.typography.labelLarge,
@@ -466,8 +464,8 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 
                     // строки таблицы
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        // drop(1) пропускает сегодняшний день (он уже показан наверху),
-                        // take(7) берёт максимум 7 дней
+                        // drop(1) - удаление текущего дня из списка
+                        // take(7) - взятие следующих 7 дней
                         weather.forecast.forecastday.drop(1).take(7).forEach { day ->
                             Row(
                                 modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp, horizontal = 4.dp),
@@ -487,11 +485,10 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.Center
                                 ) {
-                                    WeatherUtils.WeatherIcon(
-                                        code = day.day.condition.code,
-                                        modifier = Modifier.size(24.dp)
-                                    )
+                                    WeatherUtils.WeatherIcon(code = day.day.condition.code, modifier = Modifier.size(24.dp))
+
                                     Spacer(modifier = Modifier.width(4.dp))
+
                                     Text(
                                         text = day.day.condition.text,
                                         style = MaterialTheme.typography.bodySmall,
@@ -502,7 +499,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
 
                                 Text(
                                     text = "${WeatherUtils.formatTemp(day.day.tempMin, settings.tempUnit)} " +
-                                            "/ ${WeatherUtils.formatTemp(day.day.tempMax, settings.tempUnit)}",
+                                           "/ ${WeatherUtils.formatTemp(day.day.tempMax, settings.tempUnit)}",
                                     fontWeight = FontWeight.Bold,
                                     textAlign = TextAlign.End,
                                     modifier = Modifier.weight(1.2f)
@@ -516,30 +513,28 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
         }
     }
 
+    // поиск
     if (showSearchDialog) {
         SearchDialog(
             searchResults = searchResults,
             searchHistory = searchHistory,
             onSearch = { query -> viewModel.searchCities(query) },
-            // ВАЖНО: addToHistory = true — в историю попадают только города из поиска
-            onCitySelected = { cityName ->
-                viewModel.loadWeatherByCity(cityName, addToHistory = true)
-            },
+            onCitySelected = { cityName -> viewModel.loadWeatherByCity(cityName, addToHistory = true) },
             onClearHistory = { viewModel.clearSearchHistory() },
             onDismiss = { showSearchDialog = false }
         )
     }
 
+    // настройки
     if (showSettingsDialog) {
         SettingsDialog(
             currentSettings = settings,
-            onSettingsChanged = { newSettings ->
-                viewModel.updateSettings(newSettings)
-            },
+            onSettingsChanged = { newSettings -> viewModel.updateSettings(newSettings) },
             onDismiss = { showSettingsDialog = false }
         )
     }
 
+    // дополнительная информация
     if (showDetailsSheet && uiState is WeatherUiState.Success) {
         val weather = (uiState as WeatherUiState.Success).data
         val current = weather.current
@@ -564,24 +559,31 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    // УФ-индекс (интенсивность ультрафиолета)
                     DetailItem(
                         stringResource(R.string.uv_index),
                         "${current.uv} (${WeatherUtils.getUvDescription(context, current.uv)})",
                         modifier = Modifier.weight(1f)
                     )
+
+                    // уровень загрязнения воздуха
                     DetailItem(
                         stringResource(R.string.air_quality),
-                        "${current.airQuality?.pm25 ?: 0.0} (${WeatherUtils.getAqiDescription(context, current.airQuality?.epaIndex ?: 1)})",
+                        "${current.airQuality?.pm25 ?: 0.0} " +
+                                "(${WeatherUtils.getAqiDescription(context, current.airQuality?.epaIndex ?: 1)})",
                         modifier = Modifier.weight(1f)
                     )
+
+                    // фаза Луны
                     DetailItem(
                         stringResource(R.string.moon_phase),
-                        "${WeatherUtils.getMoonPhaseString(context, today?.astro?.moonPhase ?: "")} (${today?.astro?.moonIllumination ?: 0}%)",
+                        "${WeatherUtils.getMoonPhaseString(context, today?.astro?.moonPhase ?: "")} " +
+                                "(${today?.astro?.moonIllumination ?: 0}%)",
                         modifier = Modifier.weight(1f)
                     )
                 }
 
-                // КАРТА ОСАДКОВ (Яндекс Погода)
+                // карта осадков (yandex.ru)
                 Button(
                     onClick = {
                         showDetailsSheet = false
@@ -602,7 +604,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                     Text(stringResource(R.string.open_precipitation_map))
                 }
 
-                // ИСТОРИЯ ПОГОДЫ
+                // история погоды (7 предыдущих дней)
                 Button(
                     onClick = { viewModel.fetchHistory(currentCity) },
                     modifier = Modifier.fillMaxWidth(),
@@ -614,12 +616,11 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                             color = MaterialTheme.colorScheme.onPrimary,
                             strokeWidth = 2.dp
                         )
+
                         Spacer(modifier = Modifier.width(8.dp))
                     }
-                    Text(
-                        if (isHistoryLoading) stringResource(R.string.loading)
-                        else stringResource(R.string.yesterday_weather)
-                    )
+
+                    Text(if (isHistoryLoading) stringResource(R.string.loading) else stringResource(R.string.yesterday_weather))
                 }
 
                 if (historyRequested) {
@@ -666,7 +667,9 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                                                         code = histDay.day.condition.code,
                                                         modifier = Modifier.size(24.dp)
                                                     )
+
                                                     Spacer(modifier = Modifier.width(6.dp))
+
                                                     Text(
                                                         text = histDay.day.condition.text,
                                                         style = MaterialTheme.typography.bodySmall,
@@ -689,10 +692,7 @@ fun WeatherScreen(viewModel: WeatherViewModel) {
                             }
                         }
                     } else if (!isHistoryLoading) {
-                        Text(
-                            stringResource(R.string.history_unavailable),
-                            color = Color.Gray
-                        )
+                        Text(stringResource(R.string.history_unavailable), color = Color.Gray)
                     }
                 }
 
@@ -719,6 +719,7 @@ fun DetailItem(title: String, value: String, modifier: Modifier = Modifier) {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
+
             Text(
                 text = value,
                 style = MaterialTheme.typography.titleMedium,

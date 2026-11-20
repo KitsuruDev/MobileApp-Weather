@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
-import android.os.Build
 import android.os.Bundle
 import android.os.LocaleList
 import androidx.activity.compose.setContent
@@ -24,10 +23,10 @@ import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
 
-    // ViewModel создаётся в Activity (а не в setContent), чтобы можно было вызвать
-    // loadWeatherFromNotification() из handleIntent() до композиции
+    // ViewModel создаётся в Activity, чтобы можно было вызвать loadWeatherFromNotification() из handleIntent() до Composite()
     private val weatherViewModel: WeatherViewModel by viewModels()
 
+    // регистрирует обработчик, который сработает после принятия диалога "Разрешить уведомления"
     private val notificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { }
@@ -35,9 +34,7 @@ class MainActivity : AppCompatActivity() {
     override fun attachBaseContext(newBase: Context) {
         val languageCode = AppSettings.load(newBase).language
         val locale = Locale(languageCode)
-        val config = Configuration(newBase.resources.configuration).apply {
-            setLocales(LocaleList(locale))
-        }
+        val config = Configuration(newBase.resources.configuration).apply { setLocales(LocaleList(locale)) }
         applyOverrideConfiguration(config)
         super.attachBaseContext(newBase)
     }
@@ -51,6 +48,7 @@ class MainActivity : AppCompatActivity() {
         val granted = ContextCompat.checkSelfPermission(
             this, Manifest.permission.POST_NOTIFICATIONS
         ) == PackageManager.PERMISSION_GRANTED
+
         if (!granted) {
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
@@ -68,11 +66,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // если приложение открыто кликом по уведомлению — загружаем город из extra
+        // если приложение открыто кликом по уведомлению - загружается город из extra
         handleIntent(intent)
     }
 
     // если приложение уже было в памяти и пришло новое уведомление
+    // (без этого повторный клик по уведомлению при открытом приложении не переключил бы город)
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)
@@ -80,9 +79,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleIntent(intent: Intent?) {
         val city = intent?.getStringExtra(NotificationHelper.EXTRA_CITY) ?: return
-        // предотвращаем перезапись города из initializeApp
+
+        // предотвращение перезаписи города из initializeApp
         weatherViewModel.loadWeatherFromNotification(city)
-        // очищаем extra, чтобы повторный вызов onCreate с тем же intent не грузил город снова
+
+        // очистка extra
         intent.removeExtra(NotificationHelper.EXTRA_CITY)
     }
 }
